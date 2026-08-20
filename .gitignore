@@ -1,55 +1,279 @@
-# Prerequisites
-*.d
+# ==============================================================================
+# Gitignore for NTU FYP: Continuous On-Device Federated Reinforcement Learning
+# Target: STM32 ARM Cortex-M (Bare-Metal) + Python/TensorFlow + Edge MQTT Server
+# ==============================================================================
 
-# Object files
+# ------------------------------------------------------------------------------
+# 1. Python, Virtual Environments & Package Managers
+# ------------------------------------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+nosetests.xml
+coverage.xml
+
+# Jupyter Notebook Checkpoints
+.ipynb_checkpoints/
+
+# ------------------------------------------------------------------------------
+# 2. Machine Learning, TinyML & Experiment Tracking (PC & Edge)
+# ------------------------------------------------------------------------------
+# Model weights, checkpoints & large model binaries
+*.h5
+*.keras
+*.pt
+*.pth
+*.ckpt
+*.ckpt.*
+*.safetensors
+*.tflite
+checkpoints/
+saved_models/
+
+# Experiment tracking & TensorBoard logs
+events.out.tfevents.*
+runs/
+wandb/
+logs/
+*.log
+
+# Tiny Training Engine (TTE) / Intermediate Codegen Cache
+.tte_cache/
+codegen_temp/
+
+# ------------------------------------------------------------------------------
+# 3. C / C++ & Embedded Toolchain Build Outputs (GCC / ARM-GCC / Clang / MSVC)
+# ------------------------------------------------------------------------------
+# Object & Dependency files
 *.o
-*.ko
 *.obj
-*.elf
-
-# Linker output
-*.ilk
-*.map
-*.exp
+*.d
+*.ko
+*.mod*
+*.cmd
 
 # Precompiled Headers
 *.gch
 *.pch
 
-# Libraries
+# Linker outputs, symbols & debugging
+*.map
+*.ilk
+*.exp
+*.idb
+*.pdb
+*.dSYM/
+*.su
+*.dwo
+*.symvers
+modules.order
+
+# Static and Shared Libraries (built from source)
 *.lib
 *.a
 *.la
 *.lo
-
-# Shared objects (inc. Windows DLLs)
 *.dll
-*.so
-*.so.*
 *.dylib
 
-# Executables
+# Executables and Bare-Metal STM32 Firmware Targets
 *.exe
 *.out
 *.app
-*.i*86
-*.x86_64
+*.elf
 *.hex
+*.bin
+*.axf
+*.srec
+*.mot
 
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
+# ------------------------------------------------------------------------------
+# 4. Build Systems & Compilers (CMake, Make, Ninja)
+# ------------------------------------------------------------------------------
+[Bb]uild/
+[Bb]in/
+[Oo]ut/
+[Tt]arget/
+Debug/
+Release/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CMakeScripts/
+CTestTestfile.cmake
+Makefile.in
+.ninja_deps
+.ninja_log
 
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
+# ------------------------------------------------------------------------------
+# 5. Embedded IDEs & Debugger Artifacts
+# ------------------------------------------------------------------------------
+# STM32CubeIDE / Eclipse CDT (Note: .project, .cproject, and .ioc should be tracked)
+.metadata/
+mx.scratch
+*.launch
+.settings/language.settings.xml
 
-# debug information files
-*.dwo
+# Keil MDK-ARM
+*.uvopt
+*.uvoptx
+*.uvgui*
+*.dep
+*.build_log.htm
+*.htm
+*.bak
+*.orig
+
+# IAR Embedded Workbench
+*.eww
+*.ewd
+*.browse
+*.backup
+
+# Flasher, Debugger & Serial Logs (ST-Link, J-Link, OpenOCD, TeraTerm)
+JLinkLog.txt
+ST-LINK_CLI.log
+openocd.log
+*.gdb_history
+putty.log
+teraterm.log
+minicom.log
+
+# ------------------------------------------------------------------------------
+# 6. Federated Learning, MQTT Broker & Edge Credentials
+# ------------------------------------------------------------------------------
+# Mosquitto MQTT broker persistence & logs
+mosquitto.db
+mosquitto.log
+*.rdb
+
+# Secrets, TLS Certificates & Keys (Never commit private keys)
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
+.env
+.env.*
+!.env.example
+
+# ------------------------------------------------------------------------------
+# 7. Telemetry, Sensor Recordings & Raw Datasets
+# ------------------------------------------------------------------------------
+data/raw/
+data/processed/
+dataset/
+datasets/
+telemetry/
+recordings/
+*.raw
+*.dat
+*.csv.gz
+*.parquet
+*.feather
+
+# Logic Analyzer captures (Saleae, Sigrok)
+*.sal
+*.logicdata
+*.sr
+
+# ------------------------------------------------------------------------------
+# 8. IDEs, Editors & Workspaces
+# ------------------------------------------------------------------------------
+# VS Code (track shared tasks/launch configs if desired, ignore local cache)
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+.history/
+ipch/
+
+# JetBrains (CLion, PyCharm)
+.idea/
+*.iml
+
+# ------------------------------------------------------------------------------
+# 9. Office Documents & Academic Report / Thesis Toolchains
+# ------------------------------------------------------------------------------
+# Microsoft Office lock and autosave temporary files
+~$*.docx
+~$*.doc
+~$*.xlsx
+~$*.pptx
+~$*.ppt
+
+# LaTeX compilation temporaries (for FYP Reports & Presentations)
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.lot
+*.nav
+*.out
+*.run.xml
+*.snm
+*.synctex.gz
+*.toc
+*.vrb
+
+# ------------------------------------------------------------------------------
+# 10. Operating System Artifacts
+# ------------------------------------------------------------------------------
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+*~
+.directory
+.Trash-*
