@@ -1,0 +1,76 @@
+#pragma once
+#include <Arduino.h>
+
+// Binary framing over USB serial. All integers little-endian.
+//
+//   0xA5 0x5A | type u8 | seq u8 | len u16 | payload[len] | crc16 u16
+//
+// crc16 is CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF) over type..payload.
+// Must stay in sync with host/fanlog/protocol.py.
+
+enum FrameType : uint8_t {
+  FT_IMU    = 1,  // ImuHeader + n * int16[3] raw accelerometer counts
+  FT_AUDIO  = 2,  // AudioHeader + n * int16 PCM
+  FT_STATUS = 3,  // StatusPayload
+  FT_INFO   = 4,  // ASCII key=value pairs describing firmware and config
+  FT_TEXT   = 5,  // ASCII command acknowledgements and errors
+};
+
+struct __attribute__((packed)) ImuHeader {
+  uint32_t t_us;         // micros() when the frame was sent
+  uint32_t first_index;  // sample index of the first sample since START
+  uint16_t n;
+};
+
+struct __attribute__((packed)) AudioHeader {
+  uint32_t t_us;
+  uint32_t first_index;
+  uint16_t n;
+};
+
+struct __attribute__((packed)) StatusPayload {
+  uint32_t t_us;
+  uint32_t imu_samples;      // since START
+  uint32_t imu_overruns;     // FIFO overrun events since START
+  uint32_t audio_samples;    // since START
+  uint32_t audio_dropped;    // samples dropped (ring full) since START
+  uint32_t tach_pulses;      // since boot
+  uint32_t tach_period_us;   // last tach period, 0 if none yet
+  uint16_t pwm_permille;     // commanded duty, 1000 = full speed
+  int16_t  temp_centi_c;     // HTS221, INT16_MIN if unavailable
+  uint16_t humidity_centi;   // HTS221, 0xFFFF if unavailable
+  uint8_t  flags;            // see STATUS_* below
+  uint8_t  reserved;
+};
+
+enum : uint8_t {
+  STATUS_STREAMING = 1 << 0,
+  STATUS_AUDIO_ON  = 1 << 1,
+  STATUS_PWM_SET   = 1 << 2,
+  STATUS_HTS_OK    = 1 << 3,
+  STATUS_IMU_FIFO  = 1 << 4,
+};
+
+static inline uint16_t crc16Update(uint16_t crc, const uint8_t* data, size_t n) {
+  for (size_t i = 0; i < n; i++) {
+    crc ^= (uint16_t)data[i] << 8;
+    for (int b = 0; b < 8; b++) crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1;
+  }
+  return crc;
+}
+
+static uint8_t g_frameSeq = 0;
+
+static inline void sendFrame(uint8_t type, const void* payload, uint16_t len) {
+  uint8_t hdr[6] = {0xA5, 0x5A, type, g_frameSeq++, (uint8_t)(len & 0xFF), (uint8_t)(len >> 8)};
+  uint16_t crc = crc16Update(0xFFFF, hdr + 2, 4);
+  crc = crc16Update(crc, (const uint8_t*)payload, len);
+  uint8_t tail[2] = {(uint8_t)(crc & 0xFF), (uint8_t)(crc >> 8)};
+  Serial.write(hdr, sizeof(hdr));
+  Serial.write((const uint8_t*)payload, len);
+  Serial.write(tail, sizeof(tail));
+}
+
+static inline void sendText(uint8_t type, const char* s) {
+  sendFrame(type, s, (uint16_t)strlen(s));
+}

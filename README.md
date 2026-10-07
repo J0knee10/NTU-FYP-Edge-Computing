@@ -21,8 +21,26 @@ Implementation plan and decisions since the proposal: [`docs/implementation_plan
 
 | Path | Contents |
 |---|---|
-| `docs/` | Revised proposal, literature sources, school FYP schedule |
+| `docs/` | Revised proposal, implementation plan, literature sources, school FYP schedule |
+| `docs/steps/` | One how-to guide per step: what to do, what should happen, how to check it worked |
+| `firmware/` | Arduino sketches that run on the Nano 33 BLE Sense Rev1 |
+| `host/` | Python code that runs on the laptop (one package per component, shared tests) |
+| `data/` | Recordings and downloaded datasets (not in git; back up separately) |
 | `archive/` | Superseded proposals, notes and the first CWRU prototype (see `archive/README.md`) |
+
+Code is organised by **component**, not by step, because later steps reuse earlier code (the feature
+extractor from step 1 is used by every step after it). Each step has a guide in `docs/steps/` that
+points to the code it uses.
+
+| Step | Guide | Code |
+|---|---|---|
+| 0. Data collection | [`docs/steps/step0_data_collection.md`](docs/steps/step0_data_collection.md) | `firmware/logger/`, `firmware/smoke_train/`, `host/fanlog/` |
+| 1. Feature spec | — | `host/features/` (planned) |
+| 2. Anomaly model | — | `host/models/` (planned) |
+| 3. RL simulator | — | `host/rl/` (planned) |
+| 4. FL simulation | — | `host/fl/` (planned) |
+| 5. C++ port | — | `firmware/detector/` (planned) |
+| 6. Real link | — | `host/gateway/` (planned) |
 
 ## Hard deadlines
 

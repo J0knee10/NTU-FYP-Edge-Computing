@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fanlog"
+version = "0.1.0"
+description = "Data logging tools for the edge fan fault detector FYP"
+requires-python = ">=3.10"
+dependencies = ["numpy", "pyserial"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools]
+packages = ["fanlog"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

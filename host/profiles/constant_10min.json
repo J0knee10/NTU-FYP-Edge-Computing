@@ -1,0 +1,7 @@
+{
+  "name": "constant_10min",
+  "description": "Steady running at a fixed duty. Baseline normal data or a fault at one speed.",
+  "steps": [
+    {"pwm": 700, "seconds": 600, "label": "steady"}
+  ]
+}

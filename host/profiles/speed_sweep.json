@@ -1,0 +1,15 @@
+{
+  "name": "speed_sweep",
+  "description": "Warm-up, then step through duty levels. Covers every operating speed for normal or fault data.",
+  "steps": [
+    {"pwm": 1000, "seconds": 60,  "label": "warmup"},
+    {"pwm": 300,  "seconds": 120, "label": "duty30"},
+    {"pwm": 400,  "seconds": 120, "label": "duty40"},
+    {"pwm": 500,  "seconds": 120, "label": "duty50"},
+    {"pwm": 600,  "seconds": 120, "label": "duty60"},
+    {"pwm": 700,  "seconds": 120, "label": "duty70"},
+    {"pwm": 800,  "seconds": 120, "label": "duty80"},
+    {"pwm": 900,  "seconds": 120, "label": "duty90"},
+    {"pwm": 1000, "seconds": 120, "label": "duty100"}
+  ]
+}

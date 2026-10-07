@@ -1,0 +1,14 @@
+{
+  "name": "benign_drift",
+  "description": "Normal fan with slow and sudden speed changes. Source of benign-drift episodes (scenario S1) for the RL simulator.",
+  "steps": [
+    {"pwm": 500, "seconds": 300, "label": "hold50"},
+    {"pwm": 550, "seconds": 60,  "label": "ramp55"},
+    {"pwm": 600, "seconds": 60,  "label": "ramp60"},
+    {"pwm": 650, "seconds": 60,  "label": "ramp65"},
+    {"pwm": 700, "seconds": 300, "label": "hold70"},
+    {"pwm": 400, "seconds": 300, "label": "jump40"},
+    {"pwm": 900, "seconds": 300, "label": "jump90"},
+    {"pwm": 600, "seconds": 300, "label": "hold60"}
+  ]
+}
