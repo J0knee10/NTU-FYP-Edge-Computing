@@ -41,7 +41,7 @@ This step also runs a quick check that the board can train the model at all.
 
 ```
 python -m venv .venv
-.venv\Scripts\python -m pip install -e "host[dev]"
+.venv\Scripts\python -m pip install -r requirements.txt
 .venv\Scripts\python -m pytest host
 .venv\Scripts\python -m fanlog.datasets uci-accelerometer
 ```

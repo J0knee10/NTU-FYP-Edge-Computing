@@ -1,0 +1,11 @@
+# Python environment for the laptop-side code (tested with Python 3.13).
+# From the repo root:
+#   python -m venv .venv
+#   .venv\Scripts\python -m pip install -r requirements.txt
+
+numpy==2.5.3
+pyserial==3.5
+pytest==9.1.1
+
+# Project code in host/ (fanlog, ...), installed in editable mode so edits apply immediately.
+-e ./host

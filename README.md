@@ -17,6 +17,18 @@ Implementation plan and decisions since the proposal: [`docs/implementation_plan
 - Laptop (Raspberry Pi later, optional) as BLE gateway, MQTT broker and FL aggregator
 - 12 V PC fans as the test machines (PWM speed control, tach for ground-truth RPM); faults injected mechanically
 
+## Setup
+
+Python 3.13, from the repo root:
+
+```
+python -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m pytest host
+```
+
+Arduino: Arduino IDE 2 with the **Arduino Mbed OS Nano Boards** package; board **Arduino Nano 33 BLE**.
+
 ## Repository layout
 
 | Path | Contents |
