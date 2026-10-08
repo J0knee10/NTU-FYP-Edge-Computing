@@ -1,0 +1,156 @@
+{
+  "source": "fraunhofer",
+  "rounds": 8,
+  "round_len": 400,
+  "beta": 0.5,
+  "clients": [
+    {
+      "name": "D_slow",
+      "fan": "fraunhofer_D",
+      "rpm_lo": 630,
+      "rpm_hi": 1200,
+      "gain": 1.0
+    },
+    {
+      "name": "D_mid",
+      "fan": "fraunhofer_D",
+      "rpm_lo": 1200,
+      "rpm_hi": 1750,
+      "gain": 0.8
+    },
+    {
+      "name": "D_fast",
+      "fan": "fraunhofer_D",
+      "rpm_lo": 1750,
+      "rpm_hi": 2330,
+      "gain": 1.25
+    },
+    {
+      "name": "E_all",
+      "fan": "fraunhofer_E",
+      "rpm_lo": 1060,
+      "rpm_hi": 1900,
+      "gain": 1.1
+    }
+  ],
+  "bytes_per_client_per_round": 3768,
+  "bytes_per_client_per_round_float32": 15040,
+  "S4_cold_start": [
+    {
+      "new_client": "D_slow",
+      "isolated": {
+        "false_alarms": 0,
+        "frac_above_threshold_first_100": 0.0,
+        "cold_start_windows": 50,
+        "auroc_after": 0.9527
+      },
+      "fl": {
+        "false_alarms": 0,
+        "frac_above_threshold_first_100": 0.0,
+        "cold_start_windows": 50,
+        "auroc_after": 0.9518
+      }
+    },
+    {
+      "new_client": "D_mid",
+      "isolated": {
+        "false_alarms": 23,
+        "frac_above_threshold_first_100": 1.0,
+        "cold_start_windows": 208,
+        "auroc_after": 0.9207
+      },
+      "fl": {
+        "false_alarms": 11,
+        "frac_above_threshold_first_100": 0.98,
+        "cold_start_windows": null,
+        "auroc_after": 0.9253
+      }
+    },
+    {
+      "new_client": "D_fast",
+      "isolated": {
+        "false_alarms": 27,
+        "frac_above_threshold_first_100": 1.0,
+        "cold_start_windows": null,
+        "auroc_after": 0.6451
+      },
+      "fl": {
+        "false_alarms": 31,
+        "frac_above_threshold_first_100": 1.0,
+        "cold_start_windows": null,
+        "auroc_after": 0.656
+      }
+    },
+    {
+      "new_client": "E_all",
+      "isolated": {
+        "false_alarms": 7,
+        "frac_above_threshold_first_100": 0.01,
+        "cold_start_windows": 50,
+        "auroc_after": 0.8476
+      },
+      "fl": {
+        "false_alarms": 5,
+        "frac_above_threshold_first_100": 0.07,
+        "cold_start_windows": 60,
+        "auroc_after": 0.8482
+      }
+    }
+  ],
+  "S5_fleet_transfer": {
+    "A": "D_slow",
+    "B": "D_mid",
+    "fault_from_round": 4,
+    "policies": {
+      "q_learning": {
+        "A_detected": true,
+        "global_auroc_on_B_by_round": [
+          0.8691,
+          0.8774,
+          0.8736,
+          0.8941,
+          0.8843,
+          0.8876,
+          0.8958,
+          0.9077
+        ],
+        "B_detected": true,
+        "B_delay_windows": 50,
+        "B_false_alarms_before": 0
+      },
+      "always_adapt": {
+        "A_detected": true,
+        "global_auroc_on_B_by_round": [
+          0.8776,
+          0.9089,
+          0.8848,
+          0.9203,
+          0.9231,
+          0.9238,
+          0.9165,
+          0.9136
+        ],
+        "B_detected": true,
+        "B_delay_windows": 2,
+        "B_false_alarms_before": 0
+      },
+      "rule_gate": {
+        "A_detected": true,
+        "global_auroc_on_B_by_round": [
+          0.8613,
+          0.864,
+          0.8623,
+          0.8792,
+          0.8655,
+          0.869,
+          0.8648,
+          0.8582
+        ],
+        "B_detected": true,
+        "B_delay_windows": 2,
+        "B_false_alarms_before": 0
+      }
+    }
+  },
+  "seconds": 10.9
+}

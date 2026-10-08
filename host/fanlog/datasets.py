@@ -10,7 +10,6 @@ own recordings. Use fanlog.recording to get either source in the common Recordin
 from __future__ import annotations
 
 import argparse
-import io
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -25,7 +24,14 @@ DATASETS = {
     # Akasa AK-FN059 12 cm fan (1900 rpm max) with magnets on the blades, MMA8452Q at +/-8 g,
     # 12-bit, read by an Arduino UNO at 50 Hz (one sample per 20 ms). CC BY 4.0.
     "uci-accelerometer": "https://archive.ics.uci.edu/static/public/846/accelerometer.zip",
+    # Mey et al. 2020, doi:10.24406/fordatis/65 (paper arXiv:2005.12742, IEEE ETFA 2020). Shaft
+    # driven by an EC DC motor, 3 PCB M607A11 vibration sensors at 4096 Hz, Measured_RPM and V_in.
+    # 0 = no unbalance, 1-4 = 45.9, 60.7, 75.5, 152.1 mm*g; D = development (630-2330 rpm,
+    # ~107 min), E = evaluation (1060-1900 rpm, ~28 min, unbalance dismantled and reassembled).
+    # Speed steps every 20 s. CC BY 4.0. 2.6 GB; kept zipped, CSVs are read straight from it.
+    "fraunhofer-unbalance": "https://fordatis.fraunhofer.de/bitstream/fordatis/151.2/1/fraunhofer_eas_dataset_for_unbalance_detection_v1.zip",
 }
+EXTRACT = {"uci-accelerometer"}
 
 # The archive's CSV is named "accelerometer (1).csv"; it is saved under this name instead.
 UCI_CSV = "accelerometer.csv"
@@ -44,18 +50,39 @@ def download(name: str, out_root: Path) -> Path:
     url = DATASETS[name]
     dest = out_root / name
     dest.mkdir(parents=True, exist_ok=True)
-    print(f"downloading {url}")
-    with urllib.request.urlopen(url, timeout=60) as resp:
-        archive = zipfile.ZipFile(io.BytesIO(resp.read()))
+    zip_path = dest / Path(url).name
+    part = zip_path.with_suffix(".part")
+    if zip_path.exists():
+        # e.g. fetched with curl: Python's CA bundle lacks the HARICA root that Fordatis chains to
+        print(f"using existing {zip_path}")
+    else:
+        _fetch(url, part)
+        part.replace(zip_path)
+    archive = zipfile.ZipFile(zip_path)
     for member in archive.namelist():
         target = (dest / member).resolve()
         if not target.is_relative_to(dest.resolve()):
             raise ValueError(f"unsafe path in archive: {member}")
-    archive.extractall(dest)
+    if name in EXTRACT:
+        archive.extractall(dest)
+        archive.close()
+        zip_path.unlink()
     if name == "uci-accelerometer":
         _normalise_uci_name(dest)
-    print(f"extracted to {dest}: {', '.join(p.name for p in dest.iterdir())}")
+    print(f"saved to {dest}: {', '.join(p.name for p in dest.iterdir())}")
     return dest
+
+
+def _fetch(url: str, part: Path) -> None:
+    print(f"downloading {url}")
+    with urllib.request.urlopen(url, timeout=60) as resp, part.open("wb") as f:
+        total = int(resp.headers.get("Content-Length", 0))
+        done = 0
+        while chunk := resp.read(1 << 20):
+            f.write(chunk)
+            done += len(chunk)
+            if total and done % (100 << 20) < (1 << 20):
+                print(f"  {done >> 20} / {total >> 20} MB", flush=True)
 
 
 def _normalise_uci_name(dest: Path) -> None:

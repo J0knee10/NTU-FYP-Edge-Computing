@@ -71,6 +71,10 @@ Legend: **[V]** fetched and read · **[S]** confirmed via search/index metadata 
 | E5 [V] | **CWRU Bearing Data Center.** https://engineering.case.edu/bearingdatacenter · benchmark study: Smith & Randall (2015), *MSSP* 64–65:100–131 [S] | Seeded bearing faults, 2 hp motor. |
 | E6 [V] | **Paderborn** — Lessmeier et al. (2016), PHM Society Europe. https://papers.phmsociety.org/index.php/phme/article/view/1577 | Bearing damage, vibration + motor current, artificial and real damage. |
 | E7 [V] | Atmaja et al. (2022). "Lab-scale Vibration Analysis Dataset…" arXiv:2212.14732 | Lab rig: normal, unbalance, misalignment, bearing. |
+| E8 [V] | **Fraunhofer unbalance** — Mey, Neudeck, Schneider, Enge-Rosenblatt (2020). "Vibration Measurements on a Rotating Shaft at Different Unbalance Strengths", Fordatis, doi:10.24406/fordatis/65. Paper: "Machine Learning-Based Unbalance Detection of a Rotating Shaft Using Vibration Data", IEEE ETFA 2020, arXiv:2005.12742 | EC DC motor + shaft, 3 PCB M607A11 at 4096 Hz, measured RPM; no unbalance + 4 levels (45.9–152.1 mm·g); speed steps 630–2330 rpm (dev) / 1060–1900 rpm (eval, reassembled). CC BY 4.0. Paper: 98.6 % with an FC net on scaled FFT (supervised). **Our development dataset for steps 1–4.** |
+| E9 [V] | **matutani/cooling-fan** — https://github.com/matutani/cooling-fan, paper arXiv:2203.01077 | 8/12/14 cm PC cooling fans at several speeds and rooms; normal, damaged (holes/unbalance), chipped blade; precomputed spectra 1–512 Hz only. No licence in the repo. Also an on-device learning precedent. |
+| E10 [S] | **MIMII DUE** — Tanabe et al. (2021), arXiv:2105.02702, https://zenodo.org/records/4740355 | 16 kHz audio, fan sections with labelled source→target shifts (wind strength, product size, noise, temperature); faults: wing damage, unbalance, clogging, over-voltage. CC BY-NC-SA 4.0. |
+| E11 [S] | **XJTU-SY** — Wang et al., https://biaowang.tech/xjtu-sy-bearing-datasets/ | 15 bearings run to failure, 25.6 kHz, 3 conditions. Template for realistic gradual-fault trends. |
 
 ## F. On-device learning & anomaly detection
 

@@ -1,0 +1,319 @@
+{
+  "source": "fraunhofer",
+  "n_train_episodes": 2000,
+  "n_test_episodes": 200,
+  "speed_frac": 0.5,
+  "threshold": 0.5818011164665222,
+  "reward": {
+    "detect": 20.0,
+    "false_alarm": -5.0,
+    "miss": -50.0,
+    "contaminate": -2.0,
+    "delay": -0.2,
+    "adapt_drift": 0.2,
+    "train_cost": -0.01
+  },
+  "n_states": 120,
+  "states_visited": 64,
+  "train_return_last_200": {
+    "q_learning": -20.41490000000004,
+    "contextual_bandit": -19.55410000000002
+  },
+  "results": {
+    "static": {
+      "all": {
+        "episodes": 200,
+        "false_alarms_per_1000_normal_windows": 91.25,
+        "episodes_with_false_alarm": 0.5,
+        "adapt_fraction": 0.0,
+        "mean_return": -161.11,
+        "detection_rate": 0.973,
+        "mean_delay_windows": 46.2,
+        "contamination_rate": 0.0
+      },
+      "S1": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 118.38,
+        "episodes_with_false_alarm": 0.66,
+        "adapt_fraction": 0.0,
+        "mean_return": -313.7
+      },
+      "S2": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 13.31,
+        "episodes_with_false_alarm": 0.32,
+        "adapt_fraction": 0.0,
+        "mean_return": -19.41,
+        "detection_rate": 1.0,
+        "mean_delay_windows": 118.1,
+        "contamination_rate": 0.0
+      },
+      "S3": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 13.16,
+        "episodes_with_false_alarm": 0.36,
+        "adapt_fraction": 0.0,
+        "mean_return": 3.99,
+        "detection_rate": 1.0,
+        "mean_delay_windows": 1.0,
+        "contamination_rate": 0.0
+      },
+      "S1+S3": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 140.86,
+        "episodes_with_false_alarm": 0.66,
+        "adapt_fraction": 0.0,
+        "mean_return": -315.3,
+        "detection_rate": 0.92,
+        "mean_delay_windows": 17.2,
+        "contamination_rate": 0.0
+      }
+    },
+    "always_adapt": {
+      "all": {
+        "episodes": 200,
+        "false_alarms_per_1000_normal_windows": 35.59,
+        "episodes_with_false_alarm": 0.12,
+        "adapt_fraction": 0.968,
+        "mean_return": -178.2,
+        "detection_rate": 0.82,
+        "mean_delay_windows": 45.4,
+        "contamination_rate": 1.0
+      },
+      "S1": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 37.09,
+        "episodes_with_false_alarm": 0.26,
+        "adapt_fraction": 0.963,
+        "mean_return": -94.47
+      },
+      "S2": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 0.0,
+        "episodes_with_false_alarm": 0.0,
+        "adapt_fraction": 0.998,
+        "mean_return": -334.7,
+        "detection_rate": 0.82,
+        "mean_delay_windows": 123.3,
+        "contamination_rate": 1.0
+      },
+      "S3": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 0.0,
+        "episodes_with_false_alarm": 0.0,
+        "adapt_fraction": 0.996,
+        "mean_return": 15.41,
+        "detection_rate": 1.0,
+        "mean_delay_windows": 1.9,
+        "contamination_rate": 1.0
+      },
+      "S1+S3": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 70.71,
+        "episodes_with_false_alarm": 0.22,
+        "adapt_fraction": 0.936,
+        "mean_return": -299.04,
+        "detection_rate": 0.64,
+        "mean_delay_windows": 13.4,
+        "contamination_rate": 1.0
+      }
+    },
+    "rule_gate": {
+      "all": {
+        "episodes": 200,
+        "false_alarms_per_1000_normal_windows": 63.56,
+        "episodes_with_false_alarm": 0.235,
+        "adapt_fraction": 0.826,
+        "mean_return": -174.3,
+        "detection_rate": 0.893,
+        "mean_delay_windows": 44.4,
+        "contamination_rate": 0.629
+      },
+      "S1": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 90.38,
+        "episodes_with_false_alarm": 0.38,
+        "adapt_fraction": 0.824,
+        "mean_return": -243.86
+      },
+      "S2": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 1.69,
+        "episodes_with_false_alarm": 0.12,
+        "adapt_fraction": 0.842,
+        "mean_return": -192.11,
+        "detection_rate": 0.92,
+        "mean_delay_windows": 114.3,
+        "contamination_rate": 0.688
+      },
+      "S3": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 0.5,
+        "episodes_with_false_alarm": 0.08,
+        "adapt_fraction": 0.926,
+        "mean_return": 16.8,
+        "detection_rate": 1.0,
+        "mean_delay_windows": 1.8,
+        "contamination_rate": 0.0
+      },
+      "S1+S3": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 97.43,
+        "episodes_with_false_alarm": 0.36,
+        "adapt_fraction": 0.77,
+        "mean_return": -278.02,
+        "detection_rate": 0.76,
+        "mean_delay_windows": 15.9,
+        "contamination_rate": 0.486
+      }
+    },
+    "contextual_bandit": {
+      "all": {
+        "episodes": 200,
+        "false_alarms_per_1000_normal_windows": 640.75,
+        "episodes_with_false_alarm": 1.0,
+        "adapt_fraction": 0.095,
+        "mean_return": -1193.2,
+        "detection_rate": 0.707,
+        "mean_delay_windows": 18.9,
+        "contamination_rate": 0.094
+      },
+      "S1": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 619.7,
+        "episodes_with_false_alarm": 1.0,
+        "adapt_fraction": 0.103,
+        "mean_return": -1642.27
+      },
+      "S2": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 710.76,
+        "episodes_with_false_alarm": 1.0,
+        "adapt_fraction": 0.115,
+        "mean_return": -846.06,
+        "detection_rate": 1.0,
+        "mean_delay_windows": 18.6,
+        "contamination_rate": 0.499
+      },
+      "S3": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 712.14,
+        "episodes_with_false_alarm": 1.0,
+        "adapt_fraction": 0.069,
+        "mean_return": -904.97,
+        "detection_rate": 0.38,
+        "mean_delay_windows": 24.3,
+        "contamination_rate": 0.028
+      },
+      "S1+S3": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 591.71,
+        "episodes_with_false_alarm": 1.0,
+        "adapt_fraction": 0.093,
+        "mean_return": -1379.5,
+        "detection_rate": 0.74,
+        "mean_delay_windows": 16.6,
+        "contamination_rate": 0.078
+      }
+    },
+    "q_learning": {
+      "all": {
+        "episodes": 200,
+        "false_alarms_per_1000_normal_windows": 9.85,
+        "episodes_with_false_alarm": 0.555,
+        "adapt_fraction": 0.709,
+        "mean_return": -36.55,
+        "detection_rate": 0.907,
+        "mean_delay_windows": 22.9,
+        "contamination_rate": 0.461
+      },
+      "S1": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 12.75,
+        "episodes_with_false_alarm": 0.76,
+        "adapt_fraction": 0.689,
+        "mean_return": -33.26
+      },
+      "S2": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 3.54,
+        "episodes_with_false_alarm": 0.26,
+        "adapt_fraction": 0.767,
+        "mean_return": -29.24,
+        "detection_rate": 1.0,
+        "mean_delay_windows": 32.4,
+        "contamination_rate": 0.57
+      },
+      "S3": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 6.08,
+        "episodes_with_false_alarm": 0.42,
+        "adapt_fraction": 0.776,
+        "mean_return": -8.3,
+        "detection_rate": 0.94,
+        "mean_delay_windows": 8.5,
+        "contamination_rate": 0.398
+      },
+      "S1+S3": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 11.71,
+        "episodes_with_false_alarm": 0.78,
+        "adapt_fraction": 0.665,
+        "mean_return": -75.38,
+        "detection_rate": 0.78,
+        "mean_delay_windows": 28.0,
+        "contamination_rate": 0.412
+      }
+    },
+    "q_learning_refined": {
+      "all": {
+        "episodes": 200,
+        "false_alarms_per_1000_normal_windows": 1.16,
+        "episodes_with_false_alarm": 0.205,
+        "adapt_fraction": 0.83,
+        "mean_return": -102.92,
+        "detection_rate": 0.607,
+        "mean_delay_windows": 34.2,
+        "contamination_rate": 0.519
+      },
+      "S1": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 1.02,
+        "episodes_with_false_alarm": 0.34,
+        "adapt_fraction": 0.866,
+        "mean_return": -0.54
+      },
+      "S2": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 0.25,
+        "episodes_with_false_alarm": 0.06,
+        "adapt_fraction": 0.777,
+        "mean_return": -301.1,
+        "detection_rate": 0.46,
+        "mean_delay_windows": 119.7,
+        "contamination_rate": 0.575
+      },
+      "S3": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 0.58,
+        "episodes_with_false_alarm": 0.14,
+        "adapt_fraction": 0.933,
+        "mean_return": 11.91,
+        "detection_rate": 0.96,
+        "mean_delay_windows": 0.4,
+        "contamination_rate": 0.213
+      },
+      "S1+S3": {
+        "episodes": 50,
+        "false_alarms_per_1000_normal_windows": 2.08,
+        "episodes_with_false_alarm": 0.28,
+        "adapt_fraction": 0.794,
+        "mean_return": -121.97,
+        "detection_rate": 0.4,
+        "mean_delay_windows": 16.9,
+        "contamination_rate": 0.416
+      }
+    }
+  },
+  "seconds": 274.9
+}

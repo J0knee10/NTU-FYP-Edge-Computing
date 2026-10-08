@@ -1,0 +1,101 @@
+{
+  "source": "fraunhofer",
+  "spec": {
+    "window": 512,
+    "hop": 512,
+    "n_bands": 40,
+    "f_lo_hz": 2.0,
+    "f_hi_hz": 450.0
+  },
+  "n_train": 9577,
+  "candidates": {
+    "mlp_ae": {
+      "auroc_same_mount": {
+        "severity_1": 0.9542,
+        "severity_2": 0.9151,
+        "severity_3": 0.9732,
+        "severity_4": 0.999,
+        "all_faults": 0.9603
+      },
+      "auroc_after_remount": {
+        "severity_1": 0.7729,
+        "severity_2": 0.9688,
+        "severity_3": 0.9956,
+        "severity_4": 0.9984,
+        "all_faults": 0.9339
+      },
+      "device_cost": {
+        "params": 1880,
+        "ram_bytes": 8448,
+        "macs_inference": 1792,
+        "macs_train_step": 5376
+      },
+      "adaptation": {
+        "lr": 0.001,
+        "stream_windows": 2000,
+        "frac_above_threshold_frozen_by_quarter": [
+          0.91,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "frac_above_threshold_adapting_by_quarter": [
+          0.864,
+          0.654,
+          0.256,
+          0.25
+        ]
+      }
+    },
+    "pca8": {
+      "auroc_same_mount": {
+        "severity_1": 0.9294,
+        "severity_2": 0.8605,
+        "severity_3": 0.9562,
+        "severity_4": 0.9989,
+        "all_faults": 0.9362
+      },
+      "auroc_after_remount": {
+        "severity_1": 0.7034,
+        "severity_2": 0.892,
+        "severity_3": 0.9772,
+        "severity_4": 0.9959,
+        "all_faults": 0.8922
+      }
+    },
+    "mahalanobis": {
+      "auroc_same_mount": {
+        "severity_1": 0.9343,
+        "severity_2": 0.8854,
+        "severity_3": 0.9635,
+        "severity_4": 0.9992,
+        "all_faults": 0.9456
+      },
+      "auroc_after_remount": {
+        "severity_1": 0.7704,
+        "severity_2": 0.9635,
+        "severity_3": 0.9952,
+        "severity_4": 0.9986,
+        "all_faults": 0.9319
+      }
+    },
+    "kmeans16": {
+      "auroc_same_mount": {
+        "severity_1": 0.8685,
+        "severity_2": 0.8212,
+        "severity_3": 0.9319,
+        "severity_4": 0.9955,
+        "all_faults": 0.9043
+      },
+      "auroc_after_remount": {
+        "severity_1": 0.747,
+        "severity_2": 0.9566,
+        "severity_3": 0.9935,
+        "severity_4": 0.9979,
+        "all_faults": 0.9237
+      }
+    }
+  },
+  "threshold_p99_val": 0.33976563811302185,
+  "seconds": 5.2
+}

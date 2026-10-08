@@ -37,20 +37,25 @@ Arduino: Arduino IDE 2 with the **Arduino Mbed OS Nano Boards** package; board *
 | `docs/steps/` | One how-to guide per step: what to do, what should happen, how to check it worked |
 | `firmware/` | Arduino sketches that run on the Nano 33 BLE Sense Rev1 |
 | `host/` | Python code that runs on the laptop (one package per component, shared tests) |
-| `data/` | Recordings and downloaded datasets (not in git; back up separately) |
+| `data/` | Recordings, downloaded datasets and caches (not in git; back up `data/raw/` separately) |
+| `results/` | Outputs of steps 2–4 per data source, e.g. `results/step3/fraunhofer/` |
 | `archive/` | Superseded proposals, notes and the first CWRU prototype (see `archive/README.md`) |
 
 Code is organised by **component**, not by step, because later steps reuse earlier code (the feature
 extractor from step 1 is used by every step after it). Each step has a guide in `docs/steps/` that
 points to the code it uses.
 
+Steps 1–4 run on any data source with `--source fraunhofer|uci|own`. Until our own recordings
+exist they are developed on the public Fraunhofer unbalance dataset (see the plan's Datasets section);
+reported results will use `--source own`.
+
 | Step | Guide | Code |
 |---|---|---|
 | 0. Data collection | [`docs/steps/step0_data_collection.md`](docs/steps/step0_data_collection.md) | `firmware/logger/`, `firmware/smoke_train/`, `host/fanlog/` |
-| 1. Feature spec | — | `host/features/` (planned) |
-| 2. Anomaly model | — | `host/models/` (planned) |
-| 3. RL simulator | — | `host/rl/` (planned) |
-| 4. FL simulation | — | `host/fl/` (planned) |
+| 1. Feature spec | [`docs/steps/step1_features.md`](docs/steps/step1_features.md) | `host/features/` |
+| 2. Anomaly model | [`docs/steps/step2_anomaly_model.md`](docs/steps/step2_anomaly_model.md) | `host/models/` |
+| 3. RL simulator | [`docs/steps/step3_rl_simulator.md`](docs/steps/step3_rl_simulator.md) | `host/rl/` |
+| 4. FL simulation | [`docs/steps/step4_fl_simulation.md`](docs/steps/step4_fl_simulation.md) | `host/fl/` |
 | 5. C++ port | — | `firmware/detector/` (planned) |
 | 6. Real link | — | `host/gateway/` (planned) |
 

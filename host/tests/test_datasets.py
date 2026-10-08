@@ -36,8 +36,10 @@ def test_uci_recordings(tmp_path):
 
     assert len(recs) == 6
     r = recs["opposite_25"]
-    assert (r.source, r.rate_hz, r.condition, r.severity, r.speed_pct) == ("uci", 50.0, "opposite", "0", 25.0)
-    assert recs["neighbouring_20"].severity == "2"
+    assert (r.source, r.rate_hz, r.condition, r.severity, r.speed_pct) == ("uci", 50.0, "normal", 0, 25.0)
+    assert r.rpm[0] == 1900 * 0.25
+    n = recs["neighbouring_20"]
+    assert (n.condition, n.severity, n.is_fault) == ("imbalance_neighbouring", 2, True)
 
 
 def test_session_recording(tmp_path):
@@ -48,5 +50,5 @@ def test_session_recording(tmp_path):
 
     assert r.source == "own"
     assert abs(r.rate_hz - 952.0) < 1.0
-    assert r.acc_g.shape == (60 * 32, 3)
-    assert np.abs(r.acc_g).max() <= 500 * 0.000122 + 1e-12
+    assert r.acc.shape == (60 * 32, 3)
+    assert np.abs(r.acc).max() <= 500 * 0.000122 + 1e-12
