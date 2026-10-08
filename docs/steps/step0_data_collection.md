@@ -30,7 +30,7 @@ This step also runs a quick check that the board can train the model at all.
 | `firmware/logger/` | Data logger firmware (sensors, fan control, USB streaming). Settings are in `config.h` |
 | `host/fanlog/record.py` | Records one labelled session from the logger |
 | `host/fanlog/session.py` | Converts a session's raw stream into `session.npz` and checks for lost data |
-| `host/fanlog/datasets.py` | Downloads public datasets (UCI cooler-fan accelerometer set) |
+| `host/fanlog/datasets.py` | Downloads and loads public datasets (UCI cooler-fan accelerometer set) |
 | `host/profiles/*.json` | Fan speed scripts the recorder plays during a session |
 
 ---
@@ -241,5 +241,8 @@ episodes by splicing sessions of increasing severity.
 - [ ] Every fan has the normal sessions from the table and at least the imbalance severities
 - [ ] `data/` backed up
 
-**Next:** step 1 loads the `session.npz` files and designs the feature extraction (window length,
-frequency bands, statistics), using these recordings and the UCI dataset.
+**Next:** step 1 designs the feature extraction (window length, frequency bands, statistics). The
+code can be written and tested on the UCI dataset (`fanlog.recording.uci_recordings()`) while
+bring-up is still in progress, but UCI is sampled at only 50 Hz, so the actual window length and
+band edges are chosen on these recordings (`fanlog.recording.session_recordings()`). See "Datasets" in
+[`../implementation_plan.md`](../implementation_plan.md) for what UCI is and isn't used for.

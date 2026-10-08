@@ -64,7 +64,7 @@ Legend: **[V]** fetched and read · **[S]** confirmed via search/index metadata 
 
 | # | Dataset | Notes |
 |---|---|---|
-| E1 [V] | **UCI "Accelerometer"** — Sampaio et al. (2019), DOI 10.24432/C5Q61V. https://archive.ics.uci.edu/dataset/846/accelerometer | **Cooler fan with blade weights** (normal / perpendicular / opposite imbalance), 17 speeds, MMA8452Q low-cost MEMS. Closest match to the rig. |
+| E1 [V] | **UCI "Accelerometer"** — Sampaio et al. (2019), DOI 10.24432/C5Q61V. https://archive.ics.uci.edu/dataset/846/accelerometer | **Cooler fan with blade weights** (doubled weight on neighbouring / perpendicular / opposite blades; no balanced run, despite the page calling the first "normal"), 17 speeds, 50 Hz, MMA8452Q low-cost MEMS. Closest match to the rig. |
 | E2 [V] | **MIMII** — Purohit et al., DCASE 2019 Workshop. https://arxiv.org/abs/1909.09347 | Industrial fan/pump/valve/slide-rail sounds, normal + anomalous (incl. rotating unbalance). |
 | E3 [V] | **DCASE Task 2** (2020–2025). Koizumi et al. 2020 (arXiv:2006.05822); Kawaguchi et al. 2021 (arXiv:2106.04492); Dohi et al. 2023 (arXiv:2305.07828); Nishida et al. 2025 (arXiv:2506.10097) | Unsupervised anomalous sound detection trained on normal data only; fan in 2020–22 (dev+eval), 2023–25 dev only. Autoencoder baseline. |
 | E4 [V] | **MaFaulDa** (UFRJ). https://www02.smt.ufrj.br/~offshore/mfs/page_01.html | SpectraQuest rig, 700–3600 rpm, 50 kHz; normal, imbalance, misalignment, bearing faults (1,951 runs). |
