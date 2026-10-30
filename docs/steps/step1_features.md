@@ -63,6 +63,11 @@ its correlation with speed. On Fraunhofer:
 
 ## Part C: Fix the spec on our own recordings (after step 0)
 
+> The current features are a provisional baseline. The full list of feature-engineering experiments
+> to run (order-normalised bands, ablation, feature count, audio, normalisation, ...) is in
+> [`../implementation_plan.md`](../implementation_plan.md#feature-engineering-to-do-step-1). The steps
+> below are the minimum.
+
 ```
 .venv\Scripts\python -m features.report --source own
 .venv\Scripts\python -m features.report --source own --window 1024 --bands 32
@@ -94,6 +99,7 @@ only the log features, and that bands stop below Nyquist.
 ## Done when
 
 - [ ] `features.report` run on our own recordings
+- [ ] Feature-engineering experiments from the plan run, and the chosen set justified with references
 - [ ] Window length and band layout chosen and written into `host/features/spec.py`
 - [ ] Decision and reason recorded in `docs/implementation_plan.md`
 - [ ] Tests pass

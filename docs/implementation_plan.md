@@ -78,6 +78,52 @@ Other public datasets found on 8 Oct (not downloaded; see `literature_sources.md
 - **Rewards** (`rl/env.py`, `RewardConfig`): detect +20, false alarm −5 per alert, missed fault −50, ADAPT on a fault window −2, −0.2 per fault window before the alert, ADAPT on an above-threshold normal window +0.2, −0.01 per training step. With equal detect/false-alarm/miss magnitudes (first attempt) the agent learned never to alert.
 - **FL clients on Fraunhofer** (development only): the D and E mounts, three speed ranges and a per-client sensor gain (applied exactly in feature space).
 
+## Feature engineering (to do, step 1)
+
+**Status:** not started. The current 48 features (`host/features/spec.py`) are a provisional
+baseline, not an engineered set:
+- The feature *types* (band energies, RMS, kurtosis, crest factor, spectral centroid) are standard in
+  vibration condition monitoring.
+- The count of 48 only matches the proposal's 48-16-8-16-48 network.
+- The layout (40 equal 11 Hz bands from 2 to 450 Hz, 512-sample windows) is a judgment call.
+
+The examiner will ask "why these features?", so the final set must be justified by experiment and
+references. Do this on our own recordings once step 0 has data. It needs the supervisor's input too.
+
+**What we know so far** (`python -m features.report --source fraunhofer`, 8 Oct):
+- Most features correlate 0.8–0.9 with speed, so speed moves them more than faults do.
+- No single feature separates faults well (AUROC 0.20–0.68).
+- The 1× rotation region (10–40 Hz), where imbalance shows, gets only ~3 coarse bands.
+
+**Candidate experiments** (most promising first):
+
+| # | Idea | Why | Cost on the board |
+|---|---|---|---|
+| 1 | **Order-normalised bands**: bands at multiples of the rotation frequency from the tach (1×, 2×, 3×, blade-pass ± sidebands) instead of fixed Hz | Removes most of the speed dependence, so a speed change no longer looks like a fault. Directly reduces the benign-drift problem the RL gate has to handle | Low: tach is already measured; the band table is recomputed when speed changes |
+| 2 | **Finer or log-spaced low bands** | More resolution at 1× and 2×, where imbalance and looseness show | None |
+| 3 | **Window length** 256 / 512 / 1024 | Frequency resolution vs decisions per minute vs RAM | RAM = 3 × window × 4 bytes |
+| 4 | **Per-axis spectra** instead of summing x+y+z | Some faults are directional (imbalance is radial). Costs orientation independence | 3× the band features, or fewer bands per axis |
+| 5 | **Feature selection / ablation**: drop groups (bands, RMS, kurtosis, ...) one at a time and re-run step 2 | Shows which features matter, and justifies the final set in the report | Fewer features = smaller model |
+| 6 | **Feature count vs model size**: e.g. 24 or 32 inputs with a matching autoencoder | 48 was set by the proposal, not by data; fewer inputs may generalise as well and train faster on the board | Smaller model, less RAM |
+| 7 | **Audio features** from the PDM mic (band energies of 16 kHz audio) | Blade damage and obstruction may be clearer in sound than in vibration; MIMII DUE (E10) could help develop them | PDM + FFT on the MCU; more RAM |
+| 8 | **Envelope / spectral-kurtosis features** | Standard for early bearing faults | Higher; check CMSIS-DSP feasibility |
+| 9 | **Normalisation**: fixed after pre-training (current) vs running statistics updated only on ADAPT windows (closer to proposal 7.3) | A running normaliser outside the agent's control could absorb a fault; a gated one keeps the RL design consistent | Negligible |
+| 10 | **Context features** for the RL state rather than the model: temperature (HTS221), PWM duty | Helps the agent tell drift from faults | Negligible |
+
+**How to compare:** for each variant run `features.report` (separability, speed correlation), then
+`models.compare` (AUROC same mount / after re-mount, adaptation), then a short `rl.train`. Keep
+whichever helps detection and drift robustness without breaking the board's RAM and time budget.
+Every variant must use only CMSIS-DSP-friendly operations.
+
+**References needed** (none in `literature_sources.md` yet): a vibration condition-monitoring
+textbook for the standard features, the ISO 10816/20816 vibration-severity standard (RMS), a paper on
+kurtosis / spectral kurtosis for fault detection, and one on order tracking for variable-speed
+machines. Find and verify them before citing.
+
+**Discuss with the supervisor:** whether to prioritise order-normalised features (1) over audio (7),
+and how much feature engineering the report should contain, given that the project's main
+contribution is the RL gate and FL rather than the features.
+
 ## Anomaly-model candidates (step 2)
 
 | Candidate | Notes |
@@ -103,3 +149,4 @@ Selection criteria: AUROC on PC-fan faults; adaptation speed with on-device SGD 
 - PC fan inventory: how many, same model, 3-pin or 4-pin?
 - 12 V supply available?
 - Update proposal sections 7.2, 8.1 and 11 for PC fans and inform the supervisor.
+- Feature engineering: see [Feature engineering (to do, step 1)](#feature-engineering-to-do-step-1); discuss priorities with the supervisor.
