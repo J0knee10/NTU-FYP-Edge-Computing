@@ -18,10 +18,12 @@ from pathlib import Path
 import numpy as np
 
 from .protocol import (
+    ENV_FIELDS,
     FrameParser,
     FrameType,
     STATUS_FIELDS,
     decode_audio,
+    decode_env,
     decode_imu,
     decode_status,
 )
@@ -78,11 +80,15 @@ def convert(session_dir: str | Path) -> dict:
     frames = parser.feed(raw)
 
     # Unwrap all board timestamps together, in arrival order.
-    stamped = [f for f in frames if f.type in (FrameType.IMU, FrameType.AUDIO, FrameType.STATUS)]
+    stamped = [f for f in frames if f.type in (FrameType.IMU, FrameType.AUDIO, FrameType.STATUS,
+                                               FrameType.GYRO, FrameType.MAG, FrameType.ENV)]
     t_all = unwrap_u32(np.array([int.from_bytes(f.payload[:4], "little") for f in stamped]))
     t_of = {id(f): t for f, t in zip(stamped, t_all)}
 
     imu_blocks, imu_t = [], []
+    gyro_blocks, gyro_t = [], []
+    mag_blocks, mag_t = [], []
+    env_rows, env_t = [], []
     audio_blocks, audio_t = [], []
     status_rows, status_t = [], []
     texts = []
@@ -90,6 +96,15 @@ def convert(session_dir: str | Path) -> dict:
         if f.type == FrameType.IMU:
             imu_blocks.append(decode_imu(f.payload))
             imu_t.append(t_of[id(f)])
+        elif f.type == FrameType.GYRO:
+            gyro_blocks.append(decode_imu(f.payload))
+            gyro_t.append(t_of[id(f)])
+        elif f.type == FrameType.MAG:
+            mag_blocks.append(decode_imu(f.payload))
+            mag_t.append(t_of[id(f)])
+        elif f.type == FrameType.ENV:
+            env_rows.append(decode_env(f.payload))
+            env_t.append(t_of[id(f)])
         elif f.type == FrameType.AUDIO:
             audio_blocks.append(decode_audio(f.payload))
             audio_t.append(t_of[id(f)])
@@ -100,11 +115,18 @@ def convert(session_dir: str | Path) -> dict:
             texts.append(f.payload.decode("ascii", "replace"))
 
     imu, imu_index, imu_blocks_info = _concat_blocks(imu_blocks, 3)
+    gyro, gyro_index, gyro_blocks_info = _concat_blocks(gyro_blocks, 3)
+    mag, mag_index, mag_blocks_info = _concat_blocks(mag_blocks, 3)
     audio, audio_index, audio_blocks_info = _concat_blocks(audio_blocks, None)
     imu_t = np.array(imu_t, dtype=np.int64)
+    gyro_t = np.array(gyro_t, dtype=np.int64)
+    mag_t = np.array(mag_t, dtype=np.int64)
     audio_t = np.array(audio_t, dtype=np.int64)
 
     imu_rate, _ = _fit_rate(imu_blocks_info.sum(axis=1) - 1, imu_t) if len(imu_t) else (float("nan"), 0)
+    mag_rate, _ = _fit_rate(mag_blocks_info.sum(axis=1) - 1, mag_t) if len(mag_t) > 1 else (float("nan"), 0)
+    env = {name: np.array([r[name] for r in env_rows], dtype=np.int64) for name in ENV_FIELDS}
+    env["t_us"] = np.array(env_t, dtype=np.int64)
 
     status = {name: np.array([r[name] for r in status_rows], dtype=np.int64) for name in STATUS_FIELDS}
     status["t_us"] = np.array(status_t, dtype=np.int64)
@@ -117,7 +139,10 @@ def convert(session_dir: str | Path) -> dict:
         dt = np.diff(status["t_us"]) / 1e6
         rpm[1:] = np.where(dt > 0, dp / ppr / dt * 60.0, np.nan)
 
-    mg_per_lsb = float(meta.get("board_info", {}).get("imu_mg_per_lsb", "nan"))
+    info = meta.get("board_info", {})
+    mg_per_lsb = float(info.get("imu_mg_per_lsb", "nan"))
+    mdps_per_lsb = float(info.get("gyro_mdps_per_lsb", "nan"))
+    lsb_per_gauss = float(info.get("mag_lsb_per_gauss", "nan"))
     out = session_dir / "session.npz"
     np.savez_compressed(
         out,
@@ -127,6 +152,16 @@ def convert(session_dir: str | Path) -> dict:
         imu_block_t_us=imu_t,
         imu_g_per_count=np.float64(mg_per_lsb / 1000.0),
         imu_rate_hz_est=np.float64(imu_rate),
+        gyro_counts=gyro,
+        gyro_index=gyro_index,
+        gyro_dps_per_count=np.float64(mdps_per_lsb / 1000.0),
+        mag_counts=mag,
+        mag_index=mag_index,
+        mag_block_info=mag_blocks_info,
+        mag_block_t_us=mag_t,
+        mag_gauss_per_count=np.float64(1.0 / lsb_per_gauss),
+        mag_rate_hz_est=np.float64(mag_rate),
+        **{f"env_{k}": v for k, v in env.items()},
         audio_pcm=audio,
         audio_index=audio_index,
         audio_block_t_us=audio_t,
@@ -143,6 +178,13 @@ def convert(session_dir: str | Path) -> dict:
         "imu_gaps": _find_gaps(imu_blocks_info),
         "imu_overruns": int(status["imu_overruns"][-1]) if len(status_t) else 0,
         "imu_rate_hz_est": round(imu_rate, 2) if imu_rate == imu_rate else None,
+        "gyro_samples": int(len(gyro)),
+        "gyro_gaps": _find_gaps(gyro_blocks_info),
+        "mag_samples": int(len(mag)),
+        "mag_gaps": _find_gaps(mag_blocks_info),
+        "mag_overruns": int(status["mag_overruns"][-1]) if len(status_t) else 0,
+        "mag_rate_hz_est": round(mag_rate, 2) if mag_rate == mag_rate else None,
+        "env_frames": len(env_rows),
         "audio_samples": int(len(audio)),
         "audio_gaps": _find_gaps(audio_blocks_info),
         "audio_dropped": int(status["audio_dropped"][-1]) if len(status_t) else 0,

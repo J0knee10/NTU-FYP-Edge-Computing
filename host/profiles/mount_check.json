@@ -1,0 +1,17 @@
+{
+  "name": "mount_check",
+  "description": "10 min check of a board mounting: fast sweep (speed-locked vs fixed resonance peaks), 3 min hold (does the mount drift?), repeat of 50 % (same speed, same signature?).",
+  "steps": [
+    {"pwm": 1000, "seconds": 60,  "label": "warmup"},
+    {"pwm": 300,  "seconds": 40,  "label": "duty30"},
+    {"pwm": 400,  "seconds": 40,  "label": "duty40"},
+    {"pwm": 500,  "seconds": 40,  "label": "duty50"},
+    {"pwm": 600,  "seconds": 40,  "label": "duty60"},
+    {"pwm": 700,  "seconds": 40,  "label": "duty70"},
+    {"pwm": 800,  "seconds": 40,  "label": "duty80"},
+    {"pwm": 900,  "seconds": 40,  "label": "duty90"},
+    {"pwm": 1000, "seconds": 40,  "label": "duty100"},
+    {"pwm": 700,  "seconds": 180, "label": "hold70"},
+    {"pwm": 500,  "seconds": 40,  "label": "repeat50"}
+  ]
+}

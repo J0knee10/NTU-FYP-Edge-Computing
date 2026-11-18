@@ -14,6 +14,9 @@ enum FrameType : uint8_t {
   FT_STATUS = 3,  // StatusPayload
   FT_INFO   = 4,  // ASCII key=value pairs describing firmware and config
   FT_TEXT   = 5,  // ASCII command acknowledgements and errors
+  FT_GYRO   = 6,  // ImuHeader + n * int16[3] raw gyro counts (same indices as FT_IMU)
+  FT_MAG    = 7,  // ImuHeader + n * int16[3] raw magnetometer counts (own index)
+  FT_ENV    = 8,  // EnvPayload: pressure and ambient light, ~1 Hz
 };
 
 struct __attribute__((packed)) ImuHeader {
@@ -40,6 +43,20 @@ struct __attribute__((packed)) StatusPayload {
   int16_t  temp_centi_c;     // SHT3x/SHT4x, INT16_MIN if unavailable
   uint16_t humidity_centi;   // SHT3x/SHT4x, 0xFFFF if unavailable
   uint8_t  flags;            // see STATUS_* below
+  uint8_t  reserved;
+  uint32_t mag_samples;      // since START
+  uint32_t mag_overruns;     // magnetometer samples missed (ZYXOR) since START
+};
+
+struct __attribute__((packed)) EnvPayload {
+  uint32_t t_us;
+  uint32_t pressure_centi_pa;  // BMP280, 0 if unavailable
+  int16_t  baro_temp_centi_c;  // BMP280 die temperature, INT16_MIN if unavailable
+  uint16_t light_clear;        // APDS9960 raw counts, 0xFFFF if unavailable
+  uint16_t light_red;
+  uint16_t light_green;
+  uint16_t light_blue;
+  uint8_t  flags;              // bit 0: baro ok, bit 1: light ok
   uint8_t  reserved;
 };
 

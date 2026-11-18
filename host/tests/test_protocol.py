@@ -85,4 +85,22 @@ def test_status_layout_matches_firmware_header():
     fields = re.findall(r"^\s*(u?int\d+)_t\s+(\w+);", body, re.M)
     assert tuple(name for _, name in fields) == STATUS_FIELDS
     size = sum(int(re.search(r"\d+", t).group()) // 8 for t, _ in fields)
-    assert size == STATUS_STRUCT.size == 36
+    assert size == STATUS_STRUCT.size == 44
+
+
+def test_old_36_byte_status_still_decodes():
+    from fanlog.protocol import STATUS_STRUCT_V1, decode_status
+
+    old = STATUS_STRUCT_V1.pack(5, 10, 0, 0, 0, 7, 0, 500, 2500, 6000, 3, 0)
+    s = decode_status(old)
+    assert s["t_us"] == 5 and s["tach_pulses"] == 7 and s["mag_samples"] == 0
+
+
+def test_env_layout_matches_firmware_header():
+    from fanlog.protocol import ENV_FIELDS, ENV_STRUCT
+
+    src = FIRMWARE_PROTOCOL_H.read_text()
+    body = re.search(r"struct __attribute__\(\(packed\)\) EnvPayload \{(.*?)\};", src, re.S).group(1)
+    fields = re.findall(r"^\s*(u?int\d+)_t\s+(\w+);", body, re.M)
+    assert tuple(name for _, name in fields) == ENV_FIELDS
+    assert sum(int(re.search(r"\d+", t).group()) // 8 for t, _ in fields) == ENV_STRUCT.size

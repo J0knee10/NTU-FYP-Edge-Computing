@@ -25,6 +25,9 @@ class FrameType(IntEnum):
     STATUS = 3
     INFO = 4
     TEXT = 5
+    GYRO = 6  # same layout as IMU; same sample indices as the accelerometer
+    MAG = 7   # same layout as IMU; own sample index (magnetometer rate)
+    ENV = 8   # pressure and ambient light, ~1 Hz
 
 
 @dataclass(frozen=True)
@@ -105,7 +108,7 @@ class FrameParser:
 
 _SAMPLE_HEADER = struct.Struct("<IIH")  # t_us, first_index, n
 
-STATUS_STRUCT = struct.Struct("<IIIIIIIHhHBB")
+STATUS_STRUCT = struct.Struct("<IIIIIIIHhHBBII")
 STATUS_FIELDS = (
     "t_us",
     "imu_samples",
@@ -117,6 +120,23 @@ STATUS_FIELDS = (
     "pwm_permille",
     "temp_centi_c",
     "humidity_centi",
+    "flags",
+    "reserved",
+    "mag_samples",
+    "mag_overruns",
+)
+# Firmware before logger-0.3.0 sent the first 12 fields only (36 bytes).
+STATUS_STRUCT_V1 = struct.Struct("<IIIIIIIHhHBB")
+
+ENV_STRUCT = struct.Struct("<IIhHHHHBB")
+ENV_FIELDS = (
+    "t_us",
+    "pressure_centi_pa",
+    "baro_temp_centi_c",
+    "light_clear",
+    "light_red",
+    "light_green",
+    "light_blue",
     "flags",
     "reserved",
 )
@@ -148,7 +168,18 @@ def decode_audio(payload: bytes) -> SampleBlock:
 
 
 def decode_status(payload: bytes) -> dict[str, int]:
+    if len(payload) == STATUS_STRUCT_V1.size:
+        values = STATUS_STRUCT_V1.unpack(payload) + (0,) * (len(STATUS_FIELDS) - 12)
+        return dict(zip(STATUS_FIELDS, values))
     return dict(zip(STATUS_FIELDS, STATUS_STRUCT.unpack(payload)))
+
+
+decode_gyro = decode_imu
+decode_mag = decode_imu
+
+
+def decode_env(payload: bytes) -> dict[str, int]:
+    return dict(zip(ENV_FIELDS, ENV_STRUCT.unpack(payload)))
 
 
 def decode_info(payload: bytes) -> dict[str, str]:
@@ -170,3 +201,7 @@ def encode_audio(t_us: int, first_index: int, pcm: np.ndarray) -> bytes:
 
 def encode_status(**fields: int) -> bytes:
     return STATUS_STRUCT.pack(*(fields.get(name, 0) for name in STATUS_FIELDS))
+
+
+def encode_env(**fields: int) -> bytes:
+    return ENV_STRUCT.pack(*(fields.get(name, 0) for name in ENV_FIELDS))

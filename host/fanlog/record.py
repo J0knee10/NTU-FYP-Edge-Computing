@@ -16,9 +16,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import queue
 import re
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -35,21 +37,46 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class BoardLink:
-    """Serial link that parses frames and optionally tees raw bytes to a file."""
+    """Serial link that parses frames and optionally tees raw bytes to a file.
+
+    A background thread does nothing but drain the serial port into a queue. If the main
+    thread stalls (disk write, console output, a busy PC), the board keeps being read; otherwise
+    USB backs up, the board's writes block and its sensor FIFOs overflow (seen 18 Nov: 5.8 s
+    stall, 4 IMU overruns and 10 s of audio lost in a 10 min session).
+    """
 
     def __init__(self, port: str) -> None:
         self.ser = serial.Serial(port, 115200, timeout=0.05)
+        if hasattr(self.ser, "set_buffer_size"):  # Windows: larger driver receive buffer
+            self.ser.set_buffer_size(rx_size=1 << 20, tx_size=4096)
         self.parser = FrameParser()
         self.raw = None
         self.last_status: dict | None = None
         self.prev_status: dict | None = None
         self.info: dict | None = None
         self.texts: list[str] = []
+        self._rx: queue.Queue[bytes] = queue.Queue()
+        self._closing = threading.Event()
+        self._reader = threading.Thread(target=self._read_loop, name="serial-reader", daemon=True)
+        self._reader.start()
+
+    def _read_loop(self) -> None:
+        while not self._closing.is_set():
+            try:
+                data = self.ser.read(self.ser.in_waiting or 1)
+            except (serial.SerialException, OSError, TypeError, AttributeError):
+                if self._closing.is_set():
+                    return
+                raise
+            if data:
+                self._rx.put(data)
 
     def start_raw(self, path: Path) -> None:
         self.raw = path.open("wb")
 
     def close(self) -> None:
+        self._closing.set()
+        self._reader.join(timeout=1.0)
         if self.raw:
             self.raw.close()
         self.ser.close()
@@ -60,7 +87,10 @@ class BoardLink:
     def pump(self, seconds: float) -> None:
         end = time.monotonic() + seconds
         while True:
-            data = self.ser.read(self.ser.in_waiting or 1)
+            try:
+                data = self._rx.get(timeout=0.05)
+            except queue.Empty:
+                data = b""
             if data:
                 if self.raw:
                     self.raw.write(data)
