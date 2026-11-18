@@ -9,6 +9,7 @@ fault (ALERT). Federated learning shares model weights, never raw data, across a
 
 Full proposal: [`docs/FYP_predictive_maintenance_proposal.docx`](docs/FYP_predictive_maintenance_proposal.docx)
 Implementation plan and decisions since the proposal: [`docs/implementation_plan.md`](docs/implementation_plan.md)
+Current status and next steps: [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md)
 
 ## Hardware
 

@@ -30,7 +30,7 @@ This step also runs a quick check that the board can train the model at all.
 | `firmware/logger/` | Data logger firmware (sensors, fan control, USB streaming). Settings are in `config.h` |
 | `host/fanlog/record.py` | Records one labelled session from the logger |
 | `host/fanlog/session.py` | Converts a session's raw stream into `session.npz` and checks for lost data |
-| `host/fanlog/datasets.py` | Downloads and loads public datasets (UCI cooler-fan accelerometer set) |
+| `host/fanlog/datasets.py` | Downloads and loads public datasets (UCI cooler-fan accelerometer set, Fraunhofer unbalance set) |
 | `host/profiles/*.json` | Fan speed scripts the recorder plays during a session |
 
 ---
@@ -154,11 +154,12 @@ In a terminal at the repo root:
 ```
 .venv\Scripts\python -m fanlog.record --fan pc01 --mount plateA --fault normal --profile host/profiles/speed_sweep.json
 .venv\Scripts\python -m fanlog.record --fan pc01 --mount plateA --fault imbalance --severity 0.2g --profile host/profiles/speed_sweep.json
-.venv\Scripts\python -m fanlog.record --fan pc01 --fault normal --pwm 500 --duration 60
+.venv\Scripts\python -m fanlog.record --fan pc01 --mount plateA --fault normal --pwm 500 --duration 60
 ```
 
 Use `--list-ports` if the board isn't found automatically, then pass `--port COMx`. Add `--audio` to
-also record the microphone.
+also record the microphone. Always pass `--mount`: the default (`default`) would become a separate
+FL client.
 
 **What happens, in order:**
 
@@ -193,7 +194,9 @@ To re-convert a session (e.g. after a converter fix): `.venv\Scripts\python -m f
 
 ## Part F: Bring-up order
 
-Do these the first time, in this order. Each one checks one thing:
+Do these the first time, in this order. Each one checks one thing. Add `--mount plateA --out data/bringup`
+to each command, so these test sessions stay out of `data/raw/` (`--source own` trains on everything
+there, and `--fan none` would count as an extra fan).
 
 | # | Session | Command | Checks |
 |---|---|---|---|
@@ -210,7 +213,9 @@ Fault labels: `normal`, `imbalance`, `blade_damage`, `loose_mount`, `bearing_wea
 `other`. Put the amount in `--severity` (e.g. `0.2g`, `25pct`, `2screws`) and anything unusual in `--notes`.
 
 Each fan becomes one simulated client for federated learning, so record **every fan you have**, not
-just one.
+just one. Start with the minimum set on one fan (`pc01` on `plateA`; see
+[`../../SESSION_HANDOFF.md`](../../SESSION_HANDOFF.md)): it is enough for steps 1–3. Other fans and
+faults come after.
 
 | Session | Profile | Repeats per fan | Purpose |
 |---|---|---|---|
@@ -241,8 +246,8 @@ episodes by splicing sessions of increasing severity.
 - [ ] Every fan has the normal sessions from the table and at least the imbalance severities
 - [ ] `data/` backed up
 
-**Next:** step 1 designs the feature extraction (window length, frequency bands, statistics). The
-code can be written and tested on the UCI dataset (`fanlog.recording.uci_recordings()`) while
-bring-up is still in progress, but UCI is sampled at only 50 Hz, so the actual window length and
-band edges are chosen on these recordings (`fanlog.recording.session_recordings()`). See "Datasets" in
-[`../implementation_plan.md`](../implementation_plan.md) for what UCI is and isn't used for.
+**Next:** step 1 designs the feature extraction (window length, frequency bands, statistics).
+Provisional feature code already exists (8 Oct, developed on Fraunhofer); the real window length and
+band edges are chosen on these recordings (`--source own`, i.e. `fanlog.recording.session_recordings()`).
+See "Datasets" in [`../implementation_plan.md`](../implementation_plan.md) for what UCI and Fraunhofer
+are and aren't used for.

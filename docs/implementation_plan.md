@@ -39,7 +39,7 @@ Steps 0–4 are software-first: they prove the full pipeline in simulation befor
 
 | Step | Work | Output | Target |
 |---|---|---|---|
-| 0. Data | Rev1 logging firmware (IMU at ~952 Hz, mic, temperature, fan PWM duty and tach RPM); Python recorder on the laptop; scripted speed profiles; labelled fault sessions. Record **several fans / mounting setups**, since each becomes a simulated FL client. Download UCI "Accelerometer" cooler-fan dataset. Smoke test: run one dummy dense-layer forward + backward + SGD step on the board to measure RAM and time. | Labelled raw recordings + session metadata; early on-device training numbers. Guide: [`steps/step0_data_collection.md`](steps/step0_data_collection.md) | Oct 2026 |
+| 0. Data | **18 Nov: tooling written (7 Oct) and compiles, but untested on hardware; parts in hand; recording starts now. No recordings yet.** Rev1 logging firmware (IMU at ~952 Hz, mic, temperature, fan PWM duty and tach RPM); Python recorder on the laptop; scripted speed profiles; labelled fault sessions. Record **several fans / mounting setups**, since each becomes a simulated FL client. Download UCI "Accelerometer" cooler-fan dataset. Smoke test: run one dummy dense-layer forward + backward + SGD step on the board to measure RAM and time. | Labelled raw recordings + session metadata; early on-device training numbers. Guide: [`steps/step0_data_collection.md`](steps/step0_data_collection.md) | Oct 2026 |
 | 1. Feature spec | **Code done 8 Oct (provisional spec).** Fix window length, FFT size, band edges, scalar statistics and normalisation, using only operations easy to reproduce in C (CMSIS-DSP). Keep band energies as one ordered low→high block so both MLP and frequency-axis CNN candidates can use them. Write and unit-test the code on UCI first (rate taken from the recording, never hard-coded), but choose window length and band edges on our 952 Hz recordings: UCI's 25 Hz Nyquist limit makes its bands meaningless for our sensor. | `feature_spec` + Python implementation | Oct 2026 |
 | 2. Anomaly model | **Code done 8 Oct.** Compare candidates on PC-fan data (developed on Fraunhofer); pre-train the winner; NumPy reference twin of on-device SGD, checked against a line-by-line port of the firmware training step. | Chosen model, pre-trained weights, NumPy twin | Late Oct – mid Nov 2026 |
 | 3. RL simulator | **Code done 8 Oct.** Episodes built from recordings (benign drift, gradual fault, sudden fault) with the model updating online; tabular Q-learning (and contextual bandit) vs static, always-adapt and rule-based baselines. Developed on Fraunhofer episodes (train on D, test on the reassembled E rig); reported results use our recordings only. Includes the proposal's learning period and simulated online refinement. | Q-table; RQ1 results | Nov 2026, before Sem 1 exams |
@@ -146,7 +146,8 @@ Selection criteria: AUROC on PC-fan faults; adaptation speed with on-device SGD 
 
 ## Open items
 
-- PC fan inventory: how many, same model, 3-pin or 4-pin?
-- 12 V supply available?
+- Parts in hand (18 Nov). Still to confirm: PC fan inventory (how many, same model, 3-pin or 4-pin?).
+- 12 V supply on hand? (still to confirm, 18 Nov)
+- Step 0 is about a month behind the October target. A suggested re-plan and a suggested 31 Dec checkpoint (not yet agreed) are in [`../SESSION_HANDOFF.md`](../SESSION_HANDOFF.md).
 - Update proposal sections 7.2, 8.1 and 11 for PC fans and inform the supervisor.
 - Feature engineering: see [Feature engineering (to do, step 1)](#feature-engineering-to-do-step-1); discuss priorities with the supervisor.
