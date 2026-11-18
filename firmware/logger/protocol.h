@@ -37,8 +37,8 @@ struct __attribute__((packed)) StatusPayload {
   uint32_t tach_pulses;      // since boot
   uint32_t tach_period_us;   // last tach period, 0 if none yet
   uint16_t pwm_permille;     // commanded duty, 1000 = full speed
-  int16_t  temp_centi_c;     // HTS221, INT16_MIN if unavailable
-  uint16_t humidity_centi;   // HTS221, 0xFFFF if unavailable
+  int16_t  temp_centi_c;     // SHT3x/SHT4x, INT16_MIN if unavailable
+  uint16_t humidity_centi;   // SHT3x/SHT4x, 0xFFFF if unavailable
   uint8_t  flags;            // see STATUS_* below
   uint8_t  reserved;
 };
@@ -47,7 +47,7 @@ enum : uint8_t {
   STATUS_STREAMING = 1 << 0,
   STATUS_AUDIO_ON  = 1 << 1,
   STATUS_PWM_SET   = 1 << 2,
-  STATUS_HTS_OK    = 1 << 3,
+  STATUS_TH_OK     = 1 << 3,  // temperature/humidity sensor found
   STATUS_IMU_FIFO  = 1 << 4,
 };
 

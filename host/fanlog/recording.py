@@ -21,7 +21,7 @@ import numpy as np
 from .datasets import EXTERNAL, UCI_RATE_HZ, UCI_SEVERITY, load_uci_accelerometer
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-BOARD_RATE_HZ = 952.0    # LSM9DS1 accelerometer ODR used by firmware/logger
+BOARD_RATE_HZ = 833.0    # LSM6DS33 accelerometer ODR used by firmware/logger (nominal)
 NORMAL = "normal"
 UCI_MAX_RPM = 1900.0
 
@@ -46,7 +46,7 @@ class Recording:
 
 
 def resample(rec: Recording, rate_hz: float = BOARD_RATE_HZ) -> Recording:
-    """Resample to rate_hz with an anti-alias filter, e.g. 4096 Hz public data -> our 952 Hz."""
+    """Resample to rate_hz with an anti-alias filter, e.g. 4096 Hz public data -> our 833 Hz."""
     if rec.rate_hz == rate_hz:
         return rec
     from scipy.signal import resample_poly
@@ -96,7 +96,7 @@ def fraunhofer_recordings(
 ) -> list[Recording]:
     """Load the five files of one split (D = development, E = evaluation) as Recordings.
 
-    Resampled to rate_hz (default: our board's 952 Hz; None keeps 4096 Hz). The first load parses
+    Resampled to rate_hz (default: our board's 833 Hz; None keeps 4096 Hz). The first load parses
     the CSVs from the zip and caches float32 arrays in <root>/cache/.
     """
     return [_fraunhofer_one(f"{level}{split}", rate_hz, Path(root)) for level in range(5)]

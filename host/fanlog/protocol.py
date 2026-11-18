@@ -124,7 +124,7 @@ STATUS_FIELDS = (
 STATUS_STREAMING = 1 << 0
 STATUS_AUDIO_ON = 1 << 1
 STATUS_PWM_SET = 1 << 2
-STATUS_HTS_OK = 1 << 3
+STATUS_TH_OK = 1 << 3  # temperature/humidity sensor found
 STATUS_IMU_FIFO = 1 << 4
 
 

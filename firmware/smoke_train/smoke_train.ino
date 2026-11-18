@@ -11,6 +11,9 @@
 // This is a feasibility check, not the real engine (that is step 5).
 
 #include <Arduino.h>
+#ifdef USE_TINYUSB
+#include <Adafruit_TinyUSB.h>  // Adafruit nRF52 core: provides USB Serial
+#endif
 
 template <int IN, int OUT>
 struct Dense {

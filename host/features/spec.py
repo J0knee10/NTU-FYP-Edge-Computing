@@ -1,7 +1,7 @@
 """The feature specification: everything the C++ port (step 5) must reproduce exactly.
 
-PROVISIONAL. The defaults are a reasonable starting point for 12 V PC fans on the LSM9DS1 at
-952 Hz (1x rotation 10-50 Hz, blade-pass up to ~350 Hz). Step 1 fixes them on our own recordings;
+PROVISIONAL. The defaults are a reasonable starting point for 12 V PC fans on the LSM6DS33 at
+833 Hz with its 400 Hz anti-alias filter (1x rotation 10-50 Hz, blade-pass up to ~350 Hz). Step 1 fixes them on our own recordings;
 see docs/steps/step1_features.md.
 """
 
@@ -14,7 +14,7 @@ import numpy as np
 
 @dataclass(frozen=True)
 class FeatureSpec:
-    window: int = 512        # samples per window; power of 2 for the FFT (0.54 s at 952 Hz)
+    window: int = 512        # samples per window; power of 2 for the FFT (0.61 s at 833 Hz)
     hop: int = 512           # samples between window starts (= window: no overlap)
     n_bands: int = 40        # linear bands, ordered low -> high, as one block
     f_lo_hz: float = 2.0     # below this: gravity, DC drift and the sensor's 1/f noise

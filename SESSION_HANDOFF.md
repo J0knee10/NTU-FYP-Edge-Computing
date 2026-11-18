@@ -8,7 +8,7 @@ The to-do list lives in `Work/personal-assistant-bot/todos.md`.
 
 | Step | Status | Date |
 |---|---|---|
-| 0. Data | Tooling written and compiles; **never run on hardware**; no recordings yet. Parts in hand. | Code 7 Oct; parts 18 Nov |
+| 0. Data | Logger ported to the Feather Sense and bench-tested on the board (no fan yet). Smoke test passed. No recordings yet. | Code 7 Oct; board 18 Nov |
 | 1. Features | Provisional 48 features coded. Real feature engineering not started. | 8 Oct |
 | 2. Anomaly model | Done on Fraunhofer (MLP autoencoder 48-16-8-16-48, provisional) | 8 Oct |
 | 3. RL simulator | Done on Fraunhofer (Q-table + baselines) | 8 Oct |
@@ -18,10 +18,12 @@ The to-do list lives in `Work/personal-assistant-bot/todos.md`.
 
 ## Next steps, in order
 
-1. **Step 0, Parts B → G** of [`docs/steps/step0_data_collection.md`](docs/steps/step0_data_collection.md). Part A is already done on this laptop.
-   - B: mount fan and board, wire PWM/tach, do the two multimeter checks.
-   - C: smoke test (5 min, no fan). Save the RAM and time numbers for the interim report.
-   - D–F: flash the logger, then bring-up sessions 1–3 (saved to `data/bringup`, see bench tips).
+1. **Step 0, Parts B and E → G** of [`docs/steps/step0_data_collection.md`](docs/steps/step0_data_collection.md). Parts A, C and D are done (18 Nov).
+   - B: mount fan and board, wire PWM to **pin 5** and tach to **pin 6** (not D2/D3), do the two multimeter checks.
+   - C: done. 8.6 KB RAM, 0.23 ms forward and 0.58 ms train step per window (numbers in Part C).
+   - D: done. Logger 0.2.0 is on the board.
+   - E–F: bring-up sessions 1–3 (saved to `data/bringup`, see bench tips). PWM and tach are untested
+     until a fan is wired.
 2. **Minimum data set, one fan (`pc01` on `plateA`), before exams.** About 2.7 h of recording:
    normal sweep ×2, steady ×2, benign drift ×2, imbalance at 3 severities (0.1 / 0.2 / 0.5 g, sweep).
    Other fans and faults come later.
@@ -66,7 +68,7 @@ The to-do list lives in `Work/personal-assistant-bot/todos.md`.
 4. **RL agent role confirmed** (as agreed 23 Sep): per window ADAPT / FREEZE / ALERT. Its job is to
    tell a harmless change (speed, re-mount, wear-in) from a developing fault, so the model never
    learns a fault as normal. State today (`host/rl/state.py`): score level, trend, persistence, speed-change flag.
-   - Temperature and humidity (HTS221; the logger already records both) are a candidate extra
+   - Temperature and humidity (SHT30; the logger already records both) are a candidate extra
      context input (plan's feature idea #10). Test once own data exists. Supervisor question, not decided.
 5. **Pending, Jonathan to answer:** Claude offered to change the recorder so bring-up sessions save
    outside `data/raw/` by default (so they can't mix into training). Until then, use
@@ -90,9 +92,23 @@ The to-do list lives in `Work/personal-assistant-bot/todos.md`.
   (this file, `README.md`, `docs/implementation_plan.md`, `docs/steps/step0_data_collection.md`)
   are not committed yet.
 - Python tests: `pytest host -q` → **30 passed** (6 s).
-- `arduino-cli` 1.5.1, core `arduino:mbed_nano` 4.6.0, board `nano33ble`. Compile only, not flashed:
-  - `firmware/smoke_train`: OK, 88 KB flash (8 %), 53 KB RAM (20 %).
-  - `firmware/logger`: OK, 113 KB flash (11 %), 64 KB RAM (24 %).
+
+## Board correction and bring-up (18 Nov, evening)
+
+- **The board is an Adafruit Feather nRF52840 Sense (original revision), not a Nano 33 BLE Sense.**
+  Same nRF52840. I2C scan: LSM6DS33 IMU (WHO_AM_I 0x69), LIS3MDL, APDS9960, SHT30, BMP280.
+  Docs, firmware and `host/` updated. The proposal docx may still name the Nano.
+- Toolchain: the `arduino-cli` 1.1.1 bundled with Arduino IDE 2, core `adafruit:nrf52` 1.7.0, FQBN
+  `adafruit:nrf52:feather52840sense`, board on COM6. The first USB cable was charge-only.
+  - `firmware/smoke_train`: 61 KB flash (7 %), 17 KB RAM. On the board: 231 us forward, 582 us train step, loss falls.
+  - `firmware/logger` 0.2.0: 79 KB flash (9 %), 27 KB RAM (11 %). Bench test without a fan: IMU
+    ~839 Hz with 0 overruns over 16 s, 0.985 g at rest; recovers from a forced 4 s host stall with one
+    counted overrun; audio 16 kHz with 0 drops; SHT30 reads; 0 CRC errors. PWM/tach not yet tested.
+  - `firmware/i2c_scan`: new bring-up sketch.
+- Accelerometer rate is now **833 Hz** (`BOARD_RATE_HZ`). **`results/step2-4/fraunhofer` were made at
+  952 Hz and are stale**; re-run steps 2–4 before quoting them.
+- `.venv` is Python 3.11 and out of date with `requirements.txt` (no editable `host` install; pytest
+  and pyserial were added 18 Nov). Re-run `pip install -r requirements.txt` when convenient.
 
 ## Rules
 

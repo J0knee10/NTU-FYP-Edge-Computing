@@ -13,8 +13,8 @@ Current status and next steps: [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md)
 
 ## Hardware
 
-- Arduino Nano 33 BLE Sense **Rev1** — nRF52840 (Cortex-M4F @ 64 MHz, 256 KB SRAM, 1 MB flash),
-  LSM9DS1 IMU (accelerometer up to ~952 Hz), MP34DT05 PDM microphone, HTS221 temperature/humidity
+- Adafruit Feather nRF52840 Sense (original revision) — nRF52840 (Cortex-M4F @ 64 MHz, 256 KB SRAM,
+  1 MB flash), LSM6DS33 IMU (accelerometer used at 833 Hz), PDM microphone, SHT30 temperature/humidity
 - Laptop (Raspberry Pi later, optional) as BLE gateway, MQTT broker and FL aggregator
 - 12 V PC fans as the test machines (PWM speed control, tach for ground-truth RPM); faults injected mechanically
 
@@ -28,7 +28,8 @@ python -m venv .venv
 .venv\Scripts\python -m pytest host
 ```
 
-Arduino: Arduino IDE 2 with the **Arduino Mbed OS Nano Boards** package; board **Arduino Nano 33 BLE**.
+Arduino: Arduino IDE 2 with the **Adafruit nRF52** package; board **Adafruit Feather nRF52840 Sense**
+(FQBN `adafruit:nrf52:feather52840sense`). See Part A of the step 0 guide.
 
 ## Repository layout
 
@@ -36,7 +37,7 @@ Arduino: Arduino IDE 2 with the **Arduino Mbed OS Nano Boards** package; board *
 |---|---|
 | `docs/` | Revised proposal, implementation plan, literature sources, school FYP schedule |
 | `docs/steps/` | One how-to guide per step: what to do, what should happen, how to check it worked |
-| `firmware/` | Arduino sketches that run on the Nano 33 BLE Sense Rev1 |
+| `firmware/` | Arduino sketches that run on the Feather nRF52840 Sense |
 | `host/` | Python code that runs on the laptop (one package per component, shared tests) |
 | `data/` | Recordings, downloaded datasets and caches (not in git; back up `data/raw/` separately) |
 | `results/` | Outputs of steps 2–4 per data source, e.g. `results/step3/fraunhofer/` |

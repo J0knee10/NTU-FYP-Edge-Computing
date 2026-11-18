@@ -29,7 +29,7 @@ from serial.tools import list_ports
 from .protocol import FrameParser, FrameType, decode_info, decode_status
 from .session import convert
 
-ARDUINO_VID = 0x2341
+BOARD_VIDS = {0x239A: "Adafruit", 0x2341: "Arduino"}  # USB vendor IDs of supported boards
 FAULTS = ("normal", "imbalance", "blade_damage", "loose_mount", "bearing_wear", "obstruction", "other")
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -87,9 +87,9 @@ class BoardLink:
 
 
 def find_port() -> str:
-    ports = [p.device for p in list_ports.comports() if p.vid == ARDUINO_VID]
+    ports = [p.device for p in list_ports.comports() if p.vid in BOARD_VIDS]
     if len(ports) != 1:
-        sys.exit(f"Could not pick a board automatically (Arduino ports: {ports}). Use --port.")
+        sys.exit(f"Could not pick a board automatically (board ports: {ports}). Use --port.")
     return ports[0]
 
 
@@ -150,7 +150,7 @@ def main() -> None:
 
     if args.list_ports:
         for p in list_ports.comports():
-            tag = "  <- Arduino" if p.vid == ARDUINO_VID else ""
+            tag = f"  <- {BOARD_VIDS[p.vid]}" if p.vid in BOARD_VIDS else ""
             print(f"{p.device}: {p.description}{tag}")
         return
     if not args.fan or not args.fault:

@@ -12,7 +12,7 @@ own recordings** once step 0 has data.
 ```
  Recording (n × 3 samples, rate_hz)                       one row per window
  ───────────────────────────────────►  window 512 samples ──►  48 features
-                                       (0.54 s at 952 Hz)
+                                       (0.61 s at 833 Hz)
    per window, per axis: remove mean → Hann → real FFT → power
    power summed over x, y, z → 40 linear bands, 2–450 Hz → log10        (features 0–39)
    log10 RMS per axis (3), kurtosis per axis (3), crest factor (1),       (features 40–47)
@@ -75,15 +75,15 @@ its correlation with speed. On Fraunhofer:
 
 Things to decide, and how:
 
-1. **Window length.** 512 samples (0.54 s, 1.86 Hz resolution) is the starting point. Try 1024 if
+1. **Window length.** 512 samples (0.61 s, 1.63 Hz resolution at 833 Hz) is the starting point. Try 1024 if
    the 1× peak at the lowest fan speed needs finer resolution. Longer windows mean fewer decisions per
    minute and more RAM (3 × window × 4 bytes for the samples).
 2. **Band layout.** Our fans have a **tach**, so try bands at multiples of the rotation frequency
    (1×, 2×, blade-pass = blades × 1×, ...) instead of fixed Hz. That would make the features much
    less speed-dependent. It needs a small change to `window_features()`, with the window's speed
    passed in.
-3. **Upper limit.** Keep `f_hi_hz` below the LSM9DS1 Nyquist (476 Hz). Check where the blade-pass
-   frequency sits at maximum PWM.
+3. **Upper limit.** Keep `f_hi_hz` below the LSM6DS33 Nyquist (416 Hz at 833 Hz) and its 400 Hz
+   anti-alias filter. Check where the blade-pass frequency sits at maximum PWM.
 4. Write the chosen values into `DEFAULT_SPEC` in `host/features/spec.py`, rerun the tests and
    record the decision in `docs/implementation_plan.md`.
 

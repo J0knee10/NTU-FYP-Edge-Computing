@@ -1,6 +1,6 @@
-// Step 0 data logger for the Arduino Nano 33 BLE Sense Rev1.
+// Step 0 data logger for the Adafruit Feather nRF52840 Sense (LSM6DS33 revision).
 //
-// Streams accelerometer (952 Hz), optional microphone (16 kHz), temperature,
+// Streams accelerometer (833 Hz), optional microphone (16 kHz), temperature,
 // fan tach and commanded PWM to the host over USB serial using the framing in
 // protocol.h. Controlled by ASCII line commands from the host:
 //
@@ -13,6 +13,7 @@
 //
 // STATUS frames are sent every STATUS_PERIOD_MS whether or not streaming.
 
+#include <Adafruit_TinyUSB.h>  // USB Serial on the Adafruit nRF52 core
 #include <PDM.h>
 #include "config.h"
 #include "protocol.h"
@@ -52,11 +53,16 @@ static void pollImu() {
   bool overrun = false;
   int n = imu::available(&overrun);
   if (overrun) imuOverruns++;
-  for (; n > 0; n--) {
+  int16_t buf[imu::MAX_BURST][3];  // aligned; imuFrame is packed
+  while (n > 0) {
     if (imuFill == 0) imuBatchStart = imuIndex;
-    if (!imu::readSample(imuFrame.xyz[imuFill])) break;
-    imuFill++;
-    imuIndex++;
+    int want = min(min(n, IMU_BATCH - (int)imuFill), imu::MAX_BURST);
+    int got = imu::readSamples(buf, want);
+    if (got == 0) break;
+    memcpy(imuFrame.xyz[imuFill], buf, got * sizeof(buf[0]));
+    imuFill += got;
+    imuIndex += got;
+    n -= got;
     if (imuFill == IMU_BATCH) flushImuBatch();
   }
 }
@@ -129,20 +135,22 @@ static void sendStatus() {
   s.temp_centi_c = isnan(tempC) ? INT16_MIN : (int16_t)lroundf(tempC * 100);
   s.humidity_centi = isnan(humidity) ? 0xFFFF : (uint16_t)lroundf(humidity * 100);
   s.flags = (streaming ? STATUS_STREAMING : 0) | (audioOn ? STATUS_AUDIO_ON : 0) |
-            (fan::pwmSet ? STATUS_PWM_SET : 0) | (hts::ok ? STATUS_HTS_OK : 0) |
+            (fan::pwmSet ? STATUS_PWM_SET : 0) | (th::ok ? STATUS_TH_OK : 0) |
             (imu::useFifo ? STATUS_IMU_FIFO : 0);
   s.reserved = 0;
   sendFrame(FT_STATUS, &s, sizeof(s));
 }
 
 static void sendInfo() {
-  char buf[320];
+  char buf[400];
   snprintf(buf, sizeof(buf),
-           "fw=%s board=nano33ble_rev1 imu=lsm9ds1 imu_ok=%d imu_fifo=%d imu_rate_hz=%.2f "
-           "imu_fs_g=%d imu_mg_per_lsb=%.3f imu_batch=%d hts_ok=%d audio_rate=%d audio_gain=%d "
+           "fw=%s board=feather_nrf52840_sense imu=lsm6ds33 imu_whoami=0x%02X imu_ok=%d "
+           "imu_fifo=%d imu_burst=%d imu_rate_hz=%.2f imu_odr_hz=%d imu_bw_hz=%d imu_fs_g=%d "
+           "imu_mg_per_lsb=%.3f imu_batch=%d th=%s th_ok=%d audio_rate=%d audio_gain=%d "
            "pwm_pin=%d tach_pin=%d pwm_invert=%d pwm_period_us=%d status_period_ms=%d",
-           FW_VERSION, imuOk, imu::useFifo, imuRateHz, IMU_FS_G, imu::mgPerLsb, IMU_BATCH,
-           hts::ok, AUDIO_RATE, AUDIO_GAIN, PIN_FAN_PWM, PIN_FAN_TACH, FAN_PWM_INVERT,
+           FW_VERSION, imu::whoAmI & 0xFF, imuOk, imu::useFifo, imu::burstOk, imuRateHz,
+           IMU_ODR_HZ, IMU_BW_HZ, IMU_FS_G, imu::mgPerLsb, IMU_BATCH, th::name(), th::ok,
+           AUDIO_RATE, AUDIO_GAIN, PIN_FAN_PWM, PIN_FAN_TACH, FAN_PWM_INVERT,
            FAN_PWM_PERIOD_US, STATUS_PERIOD_MS);
   sendText(FT_INFO, buf);
 }
@@ -218,13 +226,13 @@ void setup() {
 
   imuOk = imu::begin(IMU_FS_G);
   if (imuOk) imuRateHz = imu::measureRateHz();
-  hts::begin();
+  th::begin();
   fan::begin();
 }
 
 void loop() {
   static uint32_t lastStatus = 0;
-  static uint32_t lastHts = 0;
+  static uint32_t lastTh = 0;
   uint32_t now = millis();
 
   pollSerial();
@@ -232,9 +240,9 @@ void loop() {
   if (streaming && imuOk) pollImu();
   if (streaming && audioOn) pollAudio();
 
-  if (now - lastHts >= HTS_PERIOD_MS) {
-    lastHts = now;
-    hts::read(tempC, humidity);
+  if (now - lastTh >= TH_PERIOD_MS) {
+    lastTh = now;
+    th::read(tempC, humidity);
   }
   if (now - lastStatus >= STATUS_PERIOD_MS) {
     lastStatus = now;

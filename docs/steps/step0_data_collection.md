@@ -9,15 +9,15 @@ This step also runs a quick check that the board can train the model at all.
 ```
                     USB cable (power + data)
   ┌──────────┐   vibration   ┌────────────────────┐  binary frames   ┌────────────────────┐
-  │  PC fan  │ ────────────► │ Nano 33 BLE Sense  │ ───────────────► │ Laptop: recorder   │
-  │  (12 V)  │ ◄──── PWM ─── │ logger firmware    │ ◄── commands ─── │ (Python)           │
+  │  PC fan  │ ────────────► │ Feather nRF52840   │ ───────────────► │ Laptop: recorder   │
+  │  (12 V)  │ ◄──── PWM ─── │ Sense: logger      │ ◄── commands ─── │ (Python)           │
   │          │ ──── tach ──► │                    │  "PWM 500" etc.  │                    │
   └──────────┘               └────────────────────┘                  └─────────┬──────────┘
                                                                                ▼
                                                     data/raw/<session>/ : meta, events, stream, session.npz
 ```
 
-- **The board measures.** Vibration 952 times a second, sound (optional, 16 kHz), temperature and fan
+- **The board measures.** Vibration 833 times a second, sound (optional, 16 kHz), temperature and fan
   speed, all sent to the laptop. It also sets the fan speed when told to.
 - **The laptop is in charge.** The recorder runs a speed script ("50 % for 5 min, then 70 %..."), saves
   everything the board sends, and labels the session with what you tell it (which fan, which fault).
@@ -28,6 +28,7 @@ This step also runs a quick check that the board can train the model at all.
 |---|---|
 | `firmware/smoke_train/` | One-off benchmark: trains a 48-16-8-16-48 autoencoder on the board and reports RAM and time per training step |
 | `firmware/logger/` | Data logger firmware (sensors, fan control, USB streaming). Settings are in `config.h` |
+| `firmware/i2c_scan/` | Bring-up check: lists the sensors on the I2C bus and identifies the IMU revision |
 | `host/fanlog/record.py` | Records one labelled session from the logger |
 | `host/fanlog/session.py` | Converts a session's raw stream into `session.npz` and checks for lost data |
 | `host/fanlog/datasets.py` | Downloads and loads public datasets (UCI cooler-fan accelerometer set, Fraunhofer unbalance set) |
@@ -48,12 +49,21 @@ python -m venv .venv
 
 **Arduino IDE 2:**
 
-1. Boards Manager → install **Arduino Mbed OS Nano Boards**.
-2. Tools → Board → **Arduino Nano 33 BLE** (this covers the Sense Rev1).
-3. Opening a `.ino` file also opens the `.h` files in the same folder as tabs. They are part of the sketch.
+1. File → Preferences → Additional boards manager URLs: add
+   `https://adafruit.github.io/arduino-board-index/package_adafruit_index.json`.
+2. Boards Manager → install **Adafruit nRF52**.
+3. Tools → Board → **Adafruit Feather nRF52840 Sense**.
+4. Opening a `.ino` file also opens the `.h` files in the same folder as tabs. They are part of the sketch.
 
-If an upload fails, double-tap the board's reset button to enter the bootloader (the LED pulses), then
-upload again.
+**Use a data USB cable.** A charge-only cable lights the board up but no COM port appears. The board
+shows up as "USB Serial Device" with Adafruit's vendor ID `239A`.
+
+If an upload fails, double-tap the board's reset button to enter the bootloader (the red LED pulses and
+a `FTHRSNSBOOT` drive appears), then upload again.
+
+**Check the board revision once:** upload `firmware/i2c_scan` and open the Serial Monitor. The logger
+supports the original Feather Sense (IMU line says `LSM6DS33`, WHO_AM_I `0x69`). Newer boards have an
+LSM6DS3TR-C (`0x6A`), which needs a different driver.
 
 > **Only one program can use the serial port at a time.** Close the IDE's Serial Monitor before running
 > the Python recorder, or the recorder cannot connect.
@@ -62,12 +72,16 @@ upload again.
 <summary>Command-line alternative (arduino-cli)</summary>
 
 `arduino-cli` is the command-line tool the IDE uses internally. It does the same job without the GUI.
+IDE 2 ships a copy at `C:\Program Files\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe`;
+pass `--config-file %USERPROFILE%\.arduinoIDE\arduino-cli.yaml` so it shares the IDE's settings.
 
 ```
-arduino-cli core install arduino:mbed_nano
+arduino-cli config add board_manager.additional_urls https://adafruit.github.io/arduino-board-index/package_adafruit_index.json
+arduino-cli core update-index
+arduino-cli core install adafruit:nrf52
 arduino-cli board list
-arduino-cli compile --fqbn arduino:mbed_nano:nano33ble firmware/logger
-arduino-cli upload  --fqbn arduino:mbed_nano:nano33ble -p COMx firmware/logger
+arduino-cli compile --fqbn adafruit:nrf52:feather52840sense firmware/logger
+arduino-cli upload  --fqbn adafruit:nrf52:feather52840sense -p COMx firmware/logger
 arduino-cli monitor -p COMx
 ```
 </details>
@@ -92,23 +106,24 @@ Standard 4-pin PC fan pinout (wire colours vary, so check the fan's label or dat
 
 | Fan pin | Function | Connect to |
 |---|---|---|
-| 1 | GND | 12 V supply GND **and** Arduino GND |
+| 1 | GND | 12 V supply GND **and** board GND |
 | 2 | +12 V | 12 V supply + only |
-| 3 | Tach (open collector, 2 pulses per revolution) | Arduino **D2** |
-| 4 | PWM (25 kHz control input) | Arduino **D3** (see check below) |
+| 3 | Tach (open collector, 2 pulses per revolution) | Feather pin **6** |
+| 4 | PWM (25 kHz control input) | Feather pin **5** (see check below) |
 
-The board is powered over USB from the laptop. **Never connect 12 V to any Arduino pin**: the nRF52840
-is 3.3 V only.
+The board is powered over USB from the laptop. **Never connect 12 V to any board pin**: the nRF52840
+is 3.3 V only. Don't use pins 2 or 3 for the fan: on the Feather Sense, 3 is not connected to anything
+and 2 is shared with the NFC antenna pad. Pins are set in `firmware/logger/config.h`.
 
-Do these two checks with a multimeter **before** connecting D2 and D3. Power the fan from 12 V with
+Do these two checks with a multimeter **before** connecting pins 5 and 6. Power the fan from 12 V with
 pins 3 and 4 not connected to anything:
 
 1. **Tach (pin 3) to GND.** Expect about 0 V or a floating reading. The firmware pulls it up to 3.3 V.
    If you read more than 3.3 V, the fan has its own pull-up: do not connect it directly. Use a resistor
    divider (e.g. 10 kΩ / 20 kΩ) instead.
 2. **PWM (pin 4) to GND.** The fan pulls this pin up internally, to 3.3 V or 5 V depending on the model.
-   - **3.3 V or less:** connect directly to D3.
-   - **About 5 V:** drive it through a small N-MOSFET (e.g. 2N7000) or NPN transistor: D3 → 1 kΩ →
+   - **3.3 V or less:** connect directly to pin 5.
+   - **About 5 V:** drive it through a small N-MOSFET (e.g. 2N7000) or NPN transistor: pin 5 → 1 kΩ →
      gate/base, drain/collector → fan pin 4, source/emitter → GND. Then set `FAN_PWM_INVERT 1` in
      `firmware/logger/config.h`, because the transistor inverts the signal.
 
@@ -126,13 +141,14 @@ This checks one thing before months go into it: can this board train the model f
    ```
    --- smoke_train: 48-16-8-16-48 MLP autoencoder, float32, SGD ---
    parameters:            1880
-   model RAM (W,b,x,y):   ~8 KB
-   gradient scratch RAM:  ~350 bytes
-   forward per window:    ... us
-   train step per window: ... us
-   loss before / after:   0.4xx / 0.00x
+   model RAM (W,b,x,y):   8224 bytes
+   gradient scratch RAM:  352 bytes
+   forward per window:    231.4 us
+   train step per window: 582.0 us
+   loss before / after:   0.874847 / 0.091550
    result: OK (loss decreased)
    ```
+   (Measured on our board, 18 Nov 2026.)
 3. **It worked if** the last line says `OK`. Training on one window should take well under a few
    milliseconds, since a window is 1 second of data. Save the numbers: they go into the interim report.
 
@@ -144,7 +160,7 @@ This checks one thing before months go into it: can this board train the model f
    and it would block the recorder.
 
 **What should happen:** when the board boots, it silently sets up the sensors, checks the IMU buffer,
-and measures its real sample rate for 1 second. It then waits for commands. The orange LED stays off
+and measures its real sample rate for 1 second. It then waits for commands. The red LED stays off
 until recording starts and blinks while recording.
 
 ## Part E: Record a session
@@ -170,14 +186,14 @@ FL client.
    updates every second:
    ```
    step 3/9: duty40 pwm=400 for 120 s
-     pwm= 40.0%  rpm=  1180  imu= 952.0 Hz  overruns=0  audio_drop=0  temp=27.3C  crc_err=0  lost=0
+     pwm= 40.0%  rpm=  1180  imu= 838.0 Hz  overruns=0  audio_drop=0  temp=27.3C  crc_err=0  lost=0
    ```
 5. At the end (or on Ctrl+C) it sends `STOP`, converts the recording, and prints a summary. If any data
    was lost, it adds `WARNING` lines.
 
 **It worked if:**
 - `rpm` changes when the PWM step changes, and is steady within a step.
-- `imu` stays around 950 Hz.
+- `imu` stays around 835–840 Hz (the sensor's own clock runs slightly fast of the nominal 833 Hz).
 - `overruns`, `audio_drop`, `crc_err` and `lost` stay at 0, and the summary has no `WARNING` lines.
 
 ### What ends up in the session folder
@@ -205,7 +221,8 @@ there, and `--fan none` would count as an extra fan).
 | 3 | Same, with audio | add `--audio` | The USB link can carry microphone data too. If `audio_drop` stays above 0, record without audio for now. |
 
 If `meta.json` shows `"imu_fifo": "0"` under `board_info`, the IMU buffer self-test failed and the
-logger fell back to polling. Sort that out before recording real data.
+logger fell back to polling. Sort that out before recording real data. `"imu_burst": "0"` is less
+serious: the buffer works but is read one value at a time, which is slower.
 
 ## Part G: Data collection
 
