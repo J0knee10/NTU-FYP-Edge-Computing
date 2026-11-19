@@ -11,7 +11,9 @@ The fan was healthy: a Thermalright TL-H12-X28-R7, 120 mm, standing free on its 
   - Temperature, humidity, pressure, light and tach.
 
   There were 0 CRC errors, 0 lost frames, 0 IMU overruns and 0 gaps. The only losses were two 16 ms audio drops at session boundaries.
-- **Placement verdict.** The tape mount is good enough for the Blu-Tack test, so keep it exactly as it is. The fan shows clearly on every motion sensor (1× is about 40 dB above the noise floor) and nothing came loose. The caveats are below: a slow drift over the night, rocking at full speed, and a few mount resonances. None of them is a placement error I couldn't work around.
+- **Placement verdict.** The tape mount worked: the fan shows clearly on every motion sensor (1× is about 40 dB above the noise floor) and nothing came loose. The caveats are below: a slow drift over the night and rocking at full speed, both from the fan standing free on its edge.
+  - **Update 19 Nov morning:** the fan was moved to lie flat (mount `flat4`, see [`docs/setup/bench_setup.md`](../../../docs/setup/bench_setup.md)), which removed the rocking.
+  - The "mount resonances" in the first version of this report turned out to be aliased motor orders (see section 3).
 - **The main feature finding.** Per-rotation (order) amplitudes, computed against an accurate fan speed, are very stable and generalise to speeds the model never saw:
   - The current 48 fixed-frequency features raise **93 %** false alarms at unseen speeds.
   - Order features raise **0.26 %**.
@@ -73,11 +75,16 @@ The board's own time base (STATUS `t_us`) runs on the RC oscillator and is 0.23 
 
 ![Spectra vs rotation order](figs/report_orders.png)
 
-Peaks that line up across speeds when plotted against rotation order belong to the fan. Peaks that move are fixed-frequency structural resonances.
+Peaks that line up across speeds when plotted against rotation order belong to the fan. Peaks that don't line up are either fixed-frequency structural resonances or aliases (below).
 
 - **Accelerometer.**
   - 1× dominates; 2× and the 6–8× and 12–14× families are also present.
-  - Broad lumps that don't line up across speeds are mount or frame resonances. Seen so far near 100, 165–175 and 266 Hz; they shift a little with temperature.
+  - Lines that don't line up across speeds and wobble over time (near 100 and 266 Hz at 70 %) are **aliases, not mount resonances.**
+    - **Cause:** the motor's strong 24×, 36× and 48× orders (700–1450 Hz) get past the IMU's 400 Hz analog filter and fold back into 0–414 Hz.
+    - **Evidence:** at 1815 rpm they land at 101 and 262 Hz, which matches. The same lines appear on the new `flat4` mount at the predicted frequencies (121 and 232 Hz at 1766 rpm).
+    - **Why they wobble:** an alias of the 36× order moves 36 times as much as 1× does, so a small speed jitter makes it wander.
+    - **Effect on features:** order features up to 12× are hardly affected, but fixed-Hz band features are.
+    - **Fix for later** (not mid-experiment): run the IMU at 1.66 kHz, or use the 200 Hz analog filter.
   - At 90–100 % a **0.5× family** appears (0.5×, 1.5×, 2.5×). That is rocking at half the running speed, the classic sign of something loose. The axis split (section 8) shows it is the **whole fan rocking on the floor**, not the board on the tape.
 - **Gyroscope.** The cleanest 1×: a pure rotation-rate signature of the frame wobbling once per revolution. It shows the same 0.5× family at high speed.
 - **Magnetometer.** A peak at **2×**, the motor's electrical frequency, so the motor has 4 poles. The peak is broad because the magnetometer is polled and its timing jitters. Its amplitude falls with speed.
@@ -176,11 +183,13 @@ Known limits:
 
 1. **Slow drift**, up to +30 % at low speed over 7 h. Handled by recording healthy references close in time to the fault runs.
 2. **0.5× rocking at 90–100 %** from the fan's footing. Treat 100 % separately or leave it out of the fault comparisons.
-3. **Mount resonances** near 100, 170 and 266 Hz. They only affect fixed-frequency features, which section 7 recommends dropping anyway.
+3. **Extra lines near 100, 170 and 266 Hz.** These are aliased motor orders, not the mount (section 3). They only affect fixed-frequency features, which section 7 recommends dropping anyway.
 
 A future improvement (not before tonight, and under a new `--mount` id): fix the fan to a heavy base through its screw holes, or stand it on a rubber mat, and strain-relieve the wires near the board. That would most likely remove points 1 and 2.
 
 ## 9. Plan for tonight (Blu-Tack imbalance)
+
+Update 19 Nov: the fan now lies flat (`flat4`). The plan is unchanged, but the healthy reference must be recorded on `flat4`. On `flat4` the in-plane 1× (x, z) baseline is about 1 mg at 30–70 %, so that is where the mass should show best.
 
 1. **Don't touch the fan or the board before the run.** Logger 0.3.1 is already flashed.
    - Mark the fan's position on the floor (tape at two corners) and leave the cables as they are.
@@ -197,8 +206,8 @@ A future improvement (not before tonight, and under a new `--mount` id): fix the
 4. **Commands** (the campaign tool takes the labels):
 
    ```
-   python -m fanlog.campaign --port COM6 --fan pc01 --mount tapeCorner --fault imbalance --severity 0.1g@25mm --until 07:30
-   python -m fanlog.record --port COM6 --fan pc01 --mount tapeCorner --fault imbalance --severity 0.1g@25mm --audio --profile host/profiles/speed_sweep.json
+   python -m fanlog.campaign --port COM6 --fan pc01 --mount flat4 --fault imbalance --severity 0.1g@25mm --until 07:30
+   python -m fanlog.record --port COM6 --fan pc01 --mount flat4 --fault imbalance --severity 0.1g@25mm --audio --profile host/profiles/speed_sweep.json
    ```
 
 5. **What I'll look at:**
