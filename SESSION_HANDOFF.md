@@ -151,6 +151,12 @@ The to-do list lives in `Work/personal-assistant-bot/todos.md`.
     - Thresholds from one held-out session give unstable false alarms (1–9 %), so calibration needs more data.
   - For step 1: take order amplitudes from 5 s tach-locked windows (a single-bin DFT on the board). A uniform spread floor of 0.03 hurts; if needed, floor per feature.
   - The 60 % step is erratic with short windows, likely aliasing; check again after 0.4.0.
+- **Evening (31 sessions), in the flat4 report, section "Full day":**
+  - **Calibration.** A pooled leave-one-session-out threshold (`feature_eval.py --loso`) is far more stable than one held-out session. Use max|z|: Mahalanobis and the AE follow drift more.
+  - **Afternoon drift.** The healthy in-plane 1× drifted from about 16:00 (board z ×0.7 at 70–80 %), about the size of a ×1.5 fault. Per-window detection of ×1.5 is therefore marginal when the model's spread includes it. Slow drift is the agent's ADAPT job, and the A-B-A comparison stays primary.
+  - **Speed gate.** Logger 0.3.1 data needs a speed gate (`--speed-gate 0.03`): bad tach readings put the 5 s narrowband features on the wrong bin.
+  - **Review.** A methods review corrected the first, overstated version of these claims; the percentile and the gate were chosen on test data.
+  - **Tonight's per-window result.** `fault_eval.py` now uses the pooled threshold for its main result (fixed before any fault data).
 - **A-B-A dry run** on healthy flat4 sweeps (fake B blocks) works end to end. `abtest.py` now also prints a combined 50–80 % effect, a spread floor of 0.02, and axial, all-axis and gyro secondaries. Details are in the protocol doc.
 - **Imbalance night plan:** `docs/experiments/2026-11-19_imbalance_ABA.md` (A-B-A with sham and hub-mass controls; `ab_block` profile; analysis `host/analysis/abtest.py`, fixed in advance).
 - **Next firmware change (after tonight):** stop the IMU aliasing of the motor's 24×/36×/48× orders (IMU at 1.66 kHz plus on-board decimation, or the 200 Hz filter). Then re-record the main dataset.
