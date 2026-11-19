@@ -39,7 +39,7 @@ Steps 0–4 are software-first: they prove the full pipeline in simulation befor
 
 | Step | Work | Output | Target |
 |---|---|---|---|
-| 0. Data | **18 Nov: logger ported to the Feather Sense and bench-tested on the board (no fan yet); smoke test passed (0.58 ms per training step). No recordings yet.** Logging firmware (IMU at ~833 Hz, mic, temperature, fan PWM duty and tach RPM); Python recorder on the laptop; scripted speed profiles; labelled fault sessions. Record **several fans / mounting setups**, since each becomes a simulated FL client. Download UCI "Accelerometer" cooler-fan dataset. Smoke test: run one dummy dense-layer forward + backward + SGD step on the board to measure RAM and time. | Labelled raw recordings + session metadata; early on-device training numbers. Guide: [`steps/step0_data_collection.md`](steps/step0_data_collection.md) | Oct 2026 |
+| 0. Data | **19 Nov: logger 0.3.2 with all onboard sensors; fan `pc01` wired. Healthy data: 7.4 h overnight on `tapeCorner` plus a daytime campaign on `flat4`. First fault (Blu-Tack imbalance, A-B-A) on the night of 19 Nov. Smoke test passed 18 Nov (0.58 ms per training step).** Logging firmware (IMU at ~833 Hz, mic, temperature, fan PWM duty and tach RPM); Python recorder on the laptop; scripted speed profiles; labelled fault sessions. Record **several fans / mounting setups**, since each becomes a simulated FL client. Download UCI "Accelerometer" cooler-fan dataset. Smoke test: run one dummy dense-layer forward + backward + SGD step on the board to measure RAM and time. | Labelled raw recordings + session metadata; early on-device training numbers. Guide: [`steps/step0_data_collection.md`](steps/step0_data_collection.md) | Oct 2026 |
 | 1. Feature spec | **Code done 8 Oct (provisional spec).** Fix window length, FFT size, band edges, scalar statistics and normalisation, using only operations easy to reproduce in C (CMSIS-DSP). Keep band energies as one ordered low→high block so both MLP and frequency-axis CNN candidates can use them. Write and unit-test the code on UCI first (rate taken from the recording, never hard-coded), but choose window length and band edges on our 833 Hz recordings: UCI's 25 Hz Nyquist limit makes its bands meaningless for our sensor. | `feature_spec` + Python implementation | Oct 2026 |
 | 2. Anomaly model | **Code done 8 Oct.** Compare candidates on PC-fan data (developed on Fraunhofer); pre-train the winner; NumPy reference twin of on-device SGD, checked against a line-by-line port of the firmware training step. | Chosen model, pre-trained weights, NumPy twin | Late Oct – mid Nov 2026 |
 | 3. RL simulator | **Code done 8 Oct.** Episodes built from recordings (benign drift, gradual fault, sudden fault) with the model updating online; tabular Q-learning (and contextual bandit) vs static, always-adapt and rule-based baselines. Developed on Fraunhofer episodes (train on D, test on the reassembled E rig); reported results use our recordings only. Includes the proposal's learning period and simulated online refinement. | Q-table; RQ1 results | Nov 2026, before Sem 1 exams |
@@ -95,6 +95,13 @@ references. Do this on our own recordings once step 0 has data. It needs the sup
 - No single feature separates faults well (AUROC 0.20–0.68).
 - The 1× rotation region (10–40 Hz), where imbalance shows, gets only ~3 coarse bands.
 
+**What our own data shows so far** (19 Nov; `results/own/overnight/REPORT.md` section 7, `host/analysis/feature_eval.py`):
+- **Fixed-Hz bands fail at speeds not seen in training** (100 % false alarms with a duty left out). Order (per-rotation) amplitudes don't shift with speed.
+- **Order features must be per axis.** Summed over axes, a doubled in-plane 1× (where an imbalance acts) is invisible behind the fore-aft rocking of the mount.
+- **Normalise each feature against its healthy value at the current speed** (a curve vs log rpm) and average about 5 s before scoring. A max-|z| detector on 11 per-axis order features then detects a doubled in-plane 1× 99.5 % of the time at 1.3 % false alarms, which matches the autoencoder with fewer false alarms.
+- **Amplitude vs speed is uneven** (mount resonances), so 10 % duty steps are too coarse to interpolate a new speed. The campaign now adds 5 % sweeps. Learning a new speed is a natural ADAPT decision for the RL agent.
+- Still to do: repeat on `flat4` and on the real imbalance data, then freeze the spec.
+
 **Candidate experiments** (most promising first):
 
 | # | Idea | Why | Cost on the board |
@@ -140,12 +147,21 @@ Selection criteria: AUROC on PC-fan faults; adaptation speed with on-device SGD 
 ## Board hardware notes (Feather nRF52840 Sense)
 
 - Arduino core `adafruit:nrf52` (FQBN `adafruit:nrf52:feather52840sense`), not Mbed. USB serial comes from TinyUSB: sketches that use `Serial` must `#include <Adafruit_TinyUSB.h>`.
-- Accelerometer: LSM6DS33 at 833 Hz with the 400 Hz analog anti-alias filter (the widest it has), so Nyquist is ~416 Hz and 1.66 kHz would add no usable bandwidth. Measured rate on our board ~836–840 Hz. Gyro off.
-- The IMU FIFO holds ~1.6 s at 833 Hz. Measured 18 Nov: when it overflows, the 12-bit level counter wraps to 0 and only the OVER_RUN/FULL flags show it; the logger resets the FIFO and counts one overrun.
+- **IMU:** LSM6DS33 accelerometer and gyro at 833 Hz, with the 400 Hz analog anti-alias filter. The measured rate is ~827 Hz in board time (the board's RC time base is 0.23 % fast). The gyro has been on since logger 0.3.0.
+- **The anti-alias filter is not enough (found 19 Nov).**
+  - The motor's 24×, 36× and 48× orders (700–1450 Hz at 70–100 %) fold back into 0–416 Hz as lines that wander with speed. At some speeds they land on whole orders 3–9.
+  - **Options, after the imbalance test and before re-recording the main dataset:**
+    - **(a) 200 Hz analog filter:** a config change, a few dB more attenuation, but it also cuts 200–400 Hz.
+    - **(b) 1.66 kHz ODR plus a half-band FIR on the board, decimating to 833 Hz.** The host format stays the same. Content from 1.25–1.66 kHz still aliases, attenuated by the analog filter.
+      - I2C budget: 20 kB/s of FIFO data in bursts is about 45 % of the bus at 400 kHz, plus about 25 % for magnetometer polling every 1 ms. Poll the magnetometer every 2 ms.
+      - The FIFO then holds only about 0.4 s (6 words per sample).
+    - Check either option with a mount check comparing alias-line levels.
+- The IMU FIFO holds ~0.8 s at 833 Hz with the gyro on. Measured 18 Nov: when it overflows, the 12-bit level counter wraps to 0 and only the OVER_RUN/FULL flags show it; the logger resets the FIFO and counts one overrun.
+- **Tach:** `micros()` follows the 1024 Hz FreeRTOS tick on this core. Logger ≥ 0.3.1 times tach edges on TIMER4 at 1 MHz, and 0.3.2 adds a glitch filter that can't lock onto a fraction of the speed. Use 0.3.2 or later.
 - Cap fan speed so blade-pass frequency (RPM / 60 × blade count) stays below ~400 Hz, e.g. 7 blades at 3,000 RPM = 350 Hz.
 - PWM control: 25 kHz on pin 5 (fan's PWM input is open-drain, 3.3 V logic is fine). Tach: pin 6, interrupt with pull-up to 3.3 V, never 12 V. Pin 3 is not connected on this board and pin 2 is an NFC pad. Share ground between the 12 V supply and the board.
 - Use a data USB cable: a charge-only one powers the board but no COM port appears.
-- Mount the fan to a fixed plate the same way every session and fix the board rigidly to the fan frame. Keep imbalance masses small (~0.1–0.5 g) and the finger guard on.
+- Mount the fan to a fixed plate the same way every session and fix the board rigidly to the fan frame. Keep imbalance masses small (~0.1–0.5 g) and the finger guard on. Current setups and photos are in [`setup/bench_setup.md`](setup/bench_setup.md).
 
 ## Open items
 

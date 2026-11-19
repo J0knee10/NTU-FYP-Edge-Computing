@@ -52,6 +52,10 @@ Optional extras if time allows:
 ## Making and placing the masses
 
 - **Weighing:** weigh a larger piece of Blu-Tack (e.g. 2.0 g), roll it into an even rod, and cut it by length (2 g in 20 equal pieces = 0.1 g each). Weigh pieces together where the scale allows, and weigh each mass again after it comes off. Note any loss.
+- **No precise scale?** A kitchen scale (1 g steps) can't weigh 0.1 g directly.
+  - Use staples as known masses: weigh a whole strip (for example 100 staples) and divide. Standard staples are typically around 30 mg each, but weigh yours.
+  - Then 3–4 staples ≈ 0.1 g, and 7 ≈ 0.2 g.
+  - Tape them flat on the blade face. Use the **same size of tape strip in every block, including the sham** (tape only), so the tape's own mass cancels out.
 - **Numbering:** number the blades from the hub label. Blade 1 is the one the label's text points to; count in the direction of rotation.
 - **Placement:**
   - 25 mm from the axis is just outside the hub, at the blade root. Press the piece firmly onto the blade face and cover it with a small strip of tape.
