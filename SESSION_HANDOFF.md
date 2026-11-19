@@ -75,8 +75,7 @@ The to-do list lives in `Work/personal-assistant-bot/todos.md`.
 
 ## Open questions for Jonathan
 
-- Fan inventory: how many, which model, 3-pin or 4-pin? (3-pin means no PWM: see Part B.)
-- Is a 12 V supply on hand?
+- Fan inventory: `pc01` is known (see `docs/setup/bench_setup.md`). Any other fans for more FL clients?
 - Supervisor: order-normalised vs audio features first? How much feature work does the report need?
   Temperature/humidity as RL context (idea #10)?
 - Recorder: save bring-up sessions outside `data/raw/` by default? (Claude offered, 18 Nov.)
@@ -111,7 +110,10 @@ The to-do list lives in `Work/personal-assistant-bot/todos.md`.
 
 ## Fan wired, logger 0.3.x and overnight campaign (18–19 Nov)
 
-- Fan `pc01` wired (PWM pin 5, tach pin 6, grounds shared). Board taped to a corner of the fan frame (`tapeCorner`).
+- Fan `pc01` = Thermalright TL-H12-X28-R7 (120 mm, 7 blades, rated 2400 rpm), wired PWM pin 5, tach pin 6,
+  grounds shared. It stands **free on its edge on the floor**; the board is taped flat on the top edge of
+  the frame near a corner (`tapeCorner`). Photo, board-axis mapping and handling rules:
+  [`docs/setup/bench_setup.md`](docs/setup/bench_setup.md).
 - Logger 0.3.0 added the gyro, magnetometer, pressure and light, and fixed an nRF52 I2C (TWIM) race
   that corrupted 1.8 % of accelerometer samples. The recorder now reads on a thread with a 1 MB buffer.
 - Logger 0.3.1 (19 Nov) fixes the tach: `micros()` on this core ticks every 976 µs, so the glitch

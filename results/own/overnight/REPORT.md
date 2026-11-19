@@ -1,6 +1,6 @@
 # Overnight healthy-fan campaign, 18–19 Nov 2026
 
-The fan was healthy, with the Feather nRF52840 Sense taped to the corner of the fan frame (mount id `tapeCorner`). The campaign ran from 00:07 to 07:49, with logger 0.3.0 for the recordings and 0.3.1 for the morning tach check. It was recorded with `host/fanlog/campaign.py` and analysed with the scripts in `host/analysis/`.
+The fan was healthy: a Thermalright TL-H12-X28-R7, 120 mm, standing free on its edge on a wooden floor. The Feather nRF52840 Sense was taped flat on the top edge of the fan frame near a corner (mount id `tapeCorner`). Photo and axis mapping: [`docs/setup/bench_setup.md`](../../../docs/setup/bench_setup.md). The campaign ran from 00:07 to 07:49, with logger 0.3.0 for the recordings and 0.3.1 for the morning tach check. It was recorded with `host/fanlog/campaign.py` and analysed with the scripts in `host/analysis/`.
 
 ## Summary
 
@@ -78,7 +78,7 @@ Peaks that line up across speeds when plotted against rotation order belong to t
 - **Accelerometer.**
   - 1× dominates; 2× and the 6–8× and 12–14× families are also present.
   - Broad lumps that don't line up across speeds are mount or frame resonances. Seen so far near 100, 165–175 and 266 Hz; they shift a little with temperature.
-  - At 90–100 % a **0.5× family** appears (0.5×, 1.5×, 2.5×). That is rocking at half the running speed, the classic sign of something loose: either the fan on the desk or the board on the tape.
+  - At 90–100 % a **0.5× family** appears (0.5×, 1.5×, 2.5×). That is rocking at half the running speed, the classic sign of something loose. The axis split (section 8) shows it is the **whole fan rocking on the floor**, not the board on the tape.
 - **Gyroscope.** The cleanest 1×: a pure rotation-rate signature of the frame wobbling once per revolution. It shows the same 0.5× family at high speed.
 - **Magnetometer.** A peak at **2×**, the motor's electrical frequency, so the motor has 4 poles. The peak is broad because the magnetometer is polled and its timing jitters. Its amplitude falls with speed.
   - It is the **most repeatable feature of the night** (1–2 % between sessions).
@@ -126,7 +126,7 @@ How to read the table:
 - Magnetometer and blade-pass audio did not change (within ±5 %).
 - The correlation with room temperature is weak (|r| ≤ 0.17), so the drift follows time more than temperature.
 
-Most likely the tape adhesive is creeping and/or the fan is settling on the desk. It is small at the speeds that matter (≤ 10 % at 60–90 %) and well below what a real imbalance should do, but it is why the plan below uses A-B-A.
+Most likely the fan, standing free on the floor, is settling, and/or the tape adhesive is creeping and the wires are pulling on the board. It is small at the speeds that matter (≤ 10 % at 60–90 %) and well below what a real imbalance should do, but it is why the plan below uses A-B-A.
 
 ![Mount drift](figs/mount_drift.png)
 
@@ -159,17 +159,32 @@ Most likely the tape adhesive is creeping and/or the fan is settling on the desk
 - No loosening, and only 0.2° of creep over 7.7 h.
 - Clean data.
 
+**Which way things move** (07:39 mount check). Board axes, from gravity and the in-plane magnetometer signal: z is up, y is along the fan axis, x is horizontal in the rotor plane.
+
+| Duty | Accel 1× x / y / z (mg) | Accel 0.5× y (mg) | Gyro 1×, main axis |
+|---|---|---|---|
+| 40 % | 1.9 / **28.7** / 1.5 | 0.1 | about x (1.3 dps) |
+| 70 % | 2.2 / **35.5** / 1.2 | 1.0 | about x (0.9 dps), z (0.6 dps) |
+| 90 % | 3.3 / **37.2** / 1.2 | 9.9 | about z (1.2 dps), x (0.9 dps) |
+| 100 % | 4.0 / 12.9 / 1.1 | **37.2** | 0.5× about x (1.4 dps) |
+
+- **The healthy 1× is the whole fan rocking fore-and-aft** on its narrow (28 mm) edge, once per revolution. A fan standing free on the floor is softest in this direction.
+- At 90–100 % that rocking switches to half speed (0.5×): the frame is rattling on the floor.
+- So the "looseness" is the fan's footing, not the tape.
+
 Known limits:
 
 1. **Slow drift**, up to +30 % at low speed over 7 h. Handled by recording healthy references close in time to the fault runs.
-2. **0.5× rocking at 90–100 %.** The fan rocks on the desk, or the board on the tape. Treat 100 % separately or leave it out of the fault comparisons.
+2. **0.5× rocking at 90–100 %** from the fan's footing. Treat 100 % separately or leave it out of the fault comparisons.
 3. **Mount resonances** near 100, 170 and 266 Hz. They only affect fixed-frequency features, which section 7 recommends dropping anyway.
 
-A future improvement (not before tonight): fix the fan's base to the desk (a clamp, a heavier base or a rubber mat) and mount the board with screws or a stiff adhesive pad. That would most likely remove points 1 and 2.
+A future improvement (not before tonight, and under a new `--mount` id): fix the fan to a heavy base through its screw holes, or stand it on a rubber mat, and strain-relieve the wires near the board. That would most likely remove points 1 and 2.
 
 ## 9. Plan for tonight (Blu-Tack imbalance)
 
 1. **Don't touch the fan or the board before the run.** Logger 0.3.1 is already flashed.
+   - Mark the fan's position on the floor (tape at two corners) and leave the cables as they are.
+   - When adding mass, unplug the 12 V supply and hold the frame still. Don't lift or slide the fan, and don't touch the board or its wires.
 2. **A-B-A design**, so a change can be blamed on the mass and not on the drift or on touching the fan:
    - **A (healthy reference):** `mount_check` plus one `speed_sweep`, right before.
    - **Sham:** touch and press the blade as if adding Blu-Tack, but add nothing, then one sweep. This measures what handling alone does to the mount.
@@ -187,6 +202,10 @@ A future improvement (not before tonight): fix the fan's base to the desk (a cla
    ```
 
 5. **What I'll look at:**
+   - **Accel 1× in x and z.** The mass adds a force that rotates in the rotor plane. The healthy baseline there is only 1–4 mg, against about 30 mg fore-aft (y).
+     - Rough size: 0.1 g at 25 mm and 1800 rpm gives about 0.09 N. If it moved a 160 g fan freely, that would be about 57 mg.
+     - The floor holds the fan back, so expect much less. Even so, a clear rise above the 2 mg baseline is likely.
+     - (160 g is borrowed from a similar Thermalright 120 mm fan; the R7's weight isn't published.)
    - Accel and gyro 1× vs speed (the expected signature is extra 1× growing with speed²).
    - The 1×-vs-speed slope.
    - 1× direction (axis split).
