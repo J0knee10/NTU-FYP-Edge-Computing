@@ -54,6 +54,27 @@ The synthetic test also overstates the problem at low speed. Multiplying a backg
 - Take the order amplitudes (at least 1×) from a long tach-locked window (about 4096 samples, 5 s) rather than from the 512-sample windows. On the board this is a single-bin DFT per order (O(n), no FFT needed).
 - Put a floor on each feature's spread, so very stable features can't dominate max|z|.
 
+## Long-window features tested (set L), with the threshold session rotated
+
+- **Sidecars.** `host/analysis/long_windows.py` adds, for every short-window row, per-axis orders from a 4096-sample (5 s) tach-locked window centred on it. They go in `windows_long/`, which is not in git; rerun the script to make them.
+- **The L set** in `feature_eval.py` is set O with these orders in place of the 0.62 s ones. Every set is then scored on the same rows: those whose whole 5 s window lies in one settled step.
+- **Rotation.** One held-out threshold session made the numbers swing; O at ×2 went from 2 % to 46 % just by changing that session. `--rotate` repeats the test with each of the 8 sweep-type training sessions as the threshold session and reports mean [min–max].
+
+`feature_eval_grid10L_rot.json` (10 % grid, 8-window median):
+
+| Set | Detector | False alarms | ×1.25 | ×1.5 | ×2 | ×1.5 at 70 / 80 % | ×1.5 at 40 / 50 / 60 % |
+|---|---|---|---|---|---|---|---|
+| O | max\|z\| | 3.8 [1.1–7.0] % | 4 | 15 [1–46] | 51 [15–75] | 19 / 21 | 15 / 0 / 13 |
+| O | AE | 2.1 [1.0–4.0] % | 3 | 18 [2–39] | 61 [50–72] | 27 / 32 | 15 / 1 / 2 |
+| **L** | **max\|z\|** | **2.1 [1.3–4.7] %** | 12 | **57 [54–62]** | 70 [62–80] | **99 / 90** | 11 / 1 / 8 |
+| L | AE | 2.8 [1.3–5.6] % | 17 | 54 [20–67] | 72 [35–87] | 90 / 77 | 19 / 6 / 9 |
+
+- **At 70–80 % the 5 s windows are what make detection work.** A ×1.5 change is caught 90–99 % of the time, against 20–30 % with 0.62 s windows, at a similar false-alarm rate. L is also much less sensitive to which session sets the threshold.
+- **At 40–60 % neither set catches a ×1.5 change** in the fan's own 1×, which is near the background there. A real added mass adds its own 1× force, so tonight's blocks will show whether it rises above the background at these speeds.
+- **No single window is enough.** Without the running median, L catches ×1.5 at 70–80 % only 59–64 % of the time: one 5 s window is not enough, and the median over 8 overlapping windows (about 9 s) is needed.
+- **A spread floor of 0.03 log10** (`feature_eval_grid10L_rot_f03.json`) lowers false alarms to about 1 %, but drops L's ×1.5 detection at 70–80 % to 14 %: the floor is larger than the 1× spread there. Don't use a uniform floor. If a floor is needed, set it per feature (for example only for 12× and the 150–400 Hz band).
+- **Oall (vector orders) stays blind** (≤ 7 % at ×2), as on `tapeCorner`. Features must be per axis.
+
 ## Unseen speeds
 
 Smooth healthy curves did not make unseen speeds easy:
@@ -71,5 +92,11 @@ Learning a new speed stays an RL-agent role (ADAPT at a new speed) rather than s
 - `feature_eval_grid10.json`: `--duties 300:800:100 --lodo 400:800` (comparable with `tapeCorner`).
 - `feature_eval_grid5.json`: `--duties 300:1000:50 --lodo 350:950`.
 - `window_length.json`: the window-length table.
+- `feature_eval_grid10L.json`: with the L set (single threshold session).
+- `feature_eval_grid10L_rot.json`: the same with the threshold session rotated.
+- `feature_eval_grid10L_rot_f03.json`: as above, with a 0.03 spread floor.
+- To rebuild:
+  - `ANALYSIS_OUT=results/own/flat4_healthy python host/analysis/long_windows.py`
+  - then `feature_eval.py --rotate --tag grid10L_rot`.
 - `summary.json`, `figs/`: `night_summary.py`, run by `autoproc.py` after each steady session.
 - A-B-A dry run on these sessions: `docs/experiments/2026-11-19_imbalance_ABA.md`.

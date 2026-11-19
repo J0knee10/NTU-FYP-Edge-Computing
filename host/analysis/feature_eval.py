@@ -1,6 +1,7 @@
 """Feature-set and detector evaluation with session-level validation (step 1 groundwork).
 
 usage: python host/analysis/feature_eval.py [--seeds 5] [--avg 8] [--duties 300:800:100] [--lodo 400:800] [--tag fine]
+                                           [--spread-floor 0.001]
 
 Reads the window tables under ANALYSIS_OUT (campaign sessions only), in time order.
 
@@ -20,6 +21,11 @@ Method:
 - **Synthetic faults.** Multiply the in-plane accelerometer 1x (board x and z) of test windows at 40-80 %
   by 1.25 / 1.5 / 2 (and optionally gyro 1x too), then count detections at the same threshold.
 - **Detectors** on the residuals: max |z|, Mahalanobis distance, and the MLP autoencoder (several seeds).
+- **Long windows.** If `long_windows.py` has written sidecars (ANALYSIS_OUT/windows_long), an extra set L uses
+  5 s tach-locked per-axis orders, and every set is scored on the same rows (whole long window settled).
+- **Spread floor.** `--spread-floor` (log10 units) stops very stable features from dominating max|z|.
+- **Rotation.** `--rotate` repeats the test with each sweep-type training session as the threshold session
+  and reports mean [min-max]: one threshold session alone makes the numbers swing.
 - **Averaging.** Optionally a running median of `avg` consecutive windows (same session and duty) before
   scoring, as the board would do over ~5 s.
 """
@@ -46,6 +52,9 @@ def load():
         z = dict(np.load(f, allow_pickle=True))
         if "campaign" in str(z["notes"]) and "acc_axis" in z:
             z["name"] = Path(f).stem
+            side = OUT / "windows_long" / Path(f).name
+            if side.exists():
+                z.update(dict(np.load(side)))
             tabs.append(z)
     return tabs
 
@@ -59,13 +68,22 @@ def feature_sets(t):
         L(t["acc_ord"][:, 6]), L(t["acc_ord"][:, 11]), L(t["acc_hf"]),     # 7x, 12x, 150-400 Hz
         L(gyr_ax[:, 0, 1]), L(gyr_ax[:, 1, 1]), L(gyr_ax[:, 2, 1]),      # gyro 1x per axis
     ])
-    return {
+    sets = {
         "A  48 fixed-Hz bands": np.asarray(t["X48"], float),
         "O  11 order features (accel+gyro, per axis)": compact,
         "O+ O plus audio 7x": np.column_stack([compact, L(t["aud_ord"][:, 6])]),
         "Oall all orders (acc 1-9, gyro 1-6, mag 1-3)": np.column_stack(
             [L(t["acc_ord"][:, :9]), L(t["gyr_ord"][:, :6]), L(t["mag_ord"][:, :3])]),
     }
+    if "acc_axis_long" in t:  # same columns as O, orders from 5 s tach-locked windows
+        al, gl = t["acc_axis_long"], t["gyr_axis_long"]
+        sets["L  11 features, 5 s tach-locked orders"] = np.column_stack([
+            L(al[:, 0, 1]), L(al[:, 1, 1]), L(al[:, 2, 1]),
+            L(al[:, :, 3].max(1)), L(al[:, :, 0].max(1)),
+            L(al[:, :, 5].max(1)), L(t["acc_ord"][:, 11]), L(t["acc_hf"]),
+            L(gl[:, 0, 1]), L(gl[:, 1, 1]), L(gl[:, 2, 1]),
+        ])
+    return sets
 
 
 
@@ -85,6 +103,9 @@ def inject(set_name, F, ip, inj, fac):
         Fi[inj, 0] += np.log10(fac)  # acc 1x x
         Fi[inj, 2] += np.log10(fac)  # acc 1x z
     return Fi
+
+
+SPREAD_FLOOR = 1e-3  # log10 units; --spread-floor
 
 
 class SpeedNorm:
@@ -116,7 +137,7 @@ class SpeedNorm:
             s_w = np.nanmedian(sw, 0) if sw else 1.4826 * np.nanmedian(np.abs(v - m), 0)
             s_b = np.nanstd(per, 0, ddof=1) if len(per) > 1 else np.zeros(F.shape[1])
             med.append(m)
-            spr.append(np.maximum(np.sqrt((s_w * shrink) ** 2 + s_b ** 2), 1e-3))
+            spr.append(np.maximum(np.sqrt((s_w * shrink) ** 2 + s_b ** 2), SPREAD_FLOOR))
         self.med, self.spr = np.array(med), np.array(spr)
 
     def __call__(self, F, lr):
@@ -152,6 +173,98 @@ def detectors(Ztr, seeds):
     return dets
 
 
+def gather(tabs, sel, set_name, duties):
+    F, lr, duty, grp, ss, ip = [], [], [], [], [], []
+    for i in sel:
+        t = tabs[i]
+        m = t["settled"] & t.get("settled_long", True) & np.isfinite(t["rpm"]) & np.isin(t["pwm"], duties)
+        F.append(feature_sets(t)[set_name][m])
+        lr.append(np.log10(t["rpm"][m]))
+        duty.append(t["pwm"][m])
+        grp.append(i * 10000 + t["pwm"][m])
+        ss.append(np.full(m.sum(), i))
+        ip.append(np.column_stack([t["acc_axis"][m][:, a, 1] for a in INPLANE]))
+    return (np.vstack(F), np.concatenate(lr), np.concatenate(duty), np.concatenate(grp),
+            np.concatenate(ss), np.vstack(ip))
+
+
+def evaluate(tabs, train_idx, th_idx, test_idx, duties, set_name, avg, seeds, lodo_duties=()):
+    """False alarms and synthetic-fault detection for one split; leave-one-duty-out if lodo_duties."""
+    tr = gather(tabs, train_idx, set_name, duties)
+    th = gather(tabs, [th_idx], set_name, duties)
+    te = gather(tabs, test_idx, set_name, duties)
+    norm = SpeedNorm(tr[0], tr[1], tr[2], tr[4], avg)
+    Ztr = running_median(norm(tr[0], tr[1]), tr[3], avg)
+    Zth = running_median(norm(th[0], th[1]), th[3], avg)
+    Zte = running_median(norm(te[0], te[1]), te[3], avg)
+    inj = (te[2] >= 400) & (te[2] <= 800)  # synthetic in-plane 1x faults on test windows at 40-80 %
+    dets = detectors(Ztr, seeds)
+    row = {}
+    for dname, score in dets.items():
+        thr = np.quantile(score(Zth), 0.99)
+        s_te = score(Zte)
+        r = {"threshold": float(thr), "FA_test": float((s_te > thr).mean()),
+             "FA_per_duty": {int(d): round(100 * float((s_te[te[2] == d] > thr).mean()), 2) for d in np.unique(te[2])}}
+        for fac in (1.25, 1.5, 2.0):
+            Fi = inject(set_name, te[0], te[5], inj, fac)
+            if Fi is not None:
+                hit = score(running_median(norm(Fi, te[1]), te[3], avg)) > thr
+                r[f"detect_x{fac}"] = float(hit[inj].mean())
+                r[f"detect_x{fac}_per_duty"] = {int(d): round(100 * float(hit[inj & (te[2] == d)].mean()), 1)
+                                                for d in np.unique(te[2][inj])}
+        row[dname] = r
+    lodo = {}
+    for d in lodo_duties:  # leave-one-duty-out false alarms (unseen speed)
+        keep = tr[2] != d
+        if keep.sum() < 100 or not (te[2] == d).any():
+            continue
+        n2 = SpeedNorm(tr[0][keep], tr[1][keep], tr[2][keep], tr[4][keep], avg)
+        Z2 = running_median(n2(tr[0][keep], tr[1][keep]), tr[3][keep], avg)
+        kth = th[2] != d
+        Z2th = running_median(n2(th[0][kth], th[1][kth]), th[3][kth], avg)
+        Z2te = running_median(n2(te[0], te[1]), te[3], avg)
+        d2 = detectors(Z2, 1)
+        for dname in ("max|z|", "Mahalanobis", "AE seed 0"):
+            thr = np.quantile(d2[dname](Z2th), 0.99)
+            lodo.setdefault(dname, {})[d] = round(100 * float((d2[dname](Z2te)[te[2] == d] > thr).mean()), 2)
+    return row, lodo
+
+
+def rotate(tabs, ntr, sweepish, test_idx, duties, avgs, seeds):
+    """Repeat the evaluation with each sweep-type training session in turn as the threshold session."""
+    out = {}
+    for avg in avgs:
+        for set_name in feature_sets(tabs[0]):
+            if set_name.startswith("A"):
+                continue
+            runs = []
+            for th_idx in sweepish:
+                train_idx = [i for i in range(ntr) if i != th_idx]
+                row, _ = evaluate(tabs, train_idx, th_idx, test_idx, duties, set_name, avg, seeds)
+                runs.append(row)
+            key = f"{set_name} | avg {avg}"
+            out[key] = {}
+            print(f"\n== {key}: mean [min-max] over {len(runs)} threshold sessions")
+            groups = {"max|z|": ["max|z|"], "Mahalanobis": ["Mahalanobis"],
+                      "AE": [k for k in runs[0] if k.startswith("AE")]}
+            for g, ks in groups.items():
+                stats = {}
+                for metric in ("FA_test", "detect_x1.25", "detect_x1.5", "detect_x2.0"):
+                    v = np.array([np.mean([r[k][metric] for k in ks]) for r in runs]) * 100
+                    stats[metric] = [float(v.mean()), float(v.min()), float(v.max())]
+                pd = {}
+                for d in runs[0][ks[0]]["detect_x1.5_per_duty"]:
+                    pd[d] = float(np.mean([r[k]["detect_x1.5_per_duty"].get(d, np.nan) for r in runs for k in ks]))
+                stats["detect_x1.5_per_duty"] = pd
+                out[key][g] = stats
+                print(f"  {g:12s} FA {stats['FA_test'][0]:5.2f} [{stats['FA_test'][1]:.2f}-{stats['FA_test'][2]:.2f}] %"
+                      + "   detect x1.25/1.5/2: " + " / ".join(
+                          f"{stats[m][0]:5.1f} [{stats[m][1]:.0f}-{stats[m][2]:.0f}]"
+                          for m in ("detect_x1.25", "detect_x1.5", "detect_x2.0"))
+                      + "   x1.5 by duty: " + " ".join(f"{d // 10}%:{v:.0f}" for d, v in pd.items()))
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", type=int, default=3)
@@ -161,7 +274,11 @@ def main():
     ap.add_argument("--duties", default="300:800:100", help="start:stop:step in permille, inclusive")
     ap.add_argument("--lodo", default="400:800", help="range of duties to leave out in turn, inclusive")
     ap.add_argument("--tag", default="", help="suffix for the output file name")
+    ap.add_argument("--spread-floor", type=float, default=1e-3, help="minimum spread per feature, log10 units")
+    ap.add_argument("--rotate", action="store_true", help="each sweep-type training session as threshold session in turn")
     args = ap.parse_args()
+    global SPREAD_FLOOR
+    SPREAD_FLOOR = args.spread_floor
     a, b, c = (int(v) for v in args.duties.split(":"))
     duties = tuple(range(a, b + 1, c))
     lo, hi = (int(v) for v in args.lodo.split(":"))
@@ -176,61 +293,21 @@ def main():
     test_idx = list(range(ntr, n))
     print(f"{n} sessions; train {len(train_idx)}, threshold session {tabs[th_idx]['name']} "
           f"({tabs[th_idx]['profile']}), test {len(test_idx)}; duties {duties}, left out in turn {lodo_duties}")
+    if args.rotate:
+        print(f"rotating the threshold session over {[str(tabs[i]['name']) for i in sweepish]}")
+        res = rotate(tabs, ntr, sweepish, test_idx, duties, sorted({1, args.avg}), args.seeds)
+        res["_config"] = {"duties": list(duties), "avg": args.avg, "seeds": args.seeds, "spread_floor": SPREAD_FLOOR,
+                          "long_windows": "acc_axis_long" in tabs[0], "rotate": True,
+                          "threshold_sessions": [str(tabs[i]["name"]) for i in sweepish],
+                          "test": [str(tabs[i]["name"]) for i in test_idx]}
+        out = OUT / f"feature_eval{'_' + args.tag if args.tag else ''}.json"
+        out.write_text(json.dumps(res, indent=1))
+        print("\nwrote", out)
+        return
     res = {}
     for avg in sorted({1, args.avg}):
         for set_name in feature_sets(tabs[0]):
-            def gather(sel):
-                F, lr, duty, grp, ss, ip = [], [], [], [], [], []
-                for i in sel:
-                    t = tabs[i]
-                    m = t["settled"] & np.isfinite(t["rpm"]) & np.isin(t["pwm"], duties)
-                    F.append(feature_sets(t)[set_name][m])
-                    lr.append(np.log10(t["rpm"][m]))
-                    duty.append(t["pwm"][m])
-                    grp.append(i * 10000 + t["pwm"][m])
-                    ss.append(np.full(m.sum(), i))
-                    ip.append(np.column_stack([t["acc_axis"][m][:, a, 1] for a in INPLANE]))
-                return (np.vstack(F), np.concatenate(lr), np.concatenate(duty), np.concatenate(grp),
-                        np.concatenate(ss), np.vstack(ip))
-
-            tr = gather(train_idx)
-            th = gather([th_idx])
-            te = gather(test_idx)
-            norm = SpeedNorm(tr[0], tr[1], tr[2], tr[4], avg)
-            Ztr = running_median(norm(tr[0], tr[1]), tr[3], avg)
-            Zth = running_median(norm(th[0], th[1]), th[3], avg)
-            Zte = running_median(norm(te[0], te[1]), te[3], avg)
-            # synthetic in-plane 1x faults on test windows at 40-80 %
-            inj = (te[2] >= 400) & (te[2] <= 800)
-            Fte_raw = te[0]
-            dets = detectors(Ztr, args.seeds)
-            row = {}
-            for dname, score in dets.items():
-                thr = np.quantile(score(Zth), 0.99)
-                s_te = score(Zte)
-                r = {"threshold": float(thr), "FA_test": float((s_te > thr).mean()),
-                     "FA_per_duty": {int(d): round(100 * float((s_te[te[2] == d] > thr).mean()), 2) for d in np.unique(te[2])}}
-                for fac in (1.25, 1.5, 2.0):
-                    Fi = inject(set_name, Fte_raw, te[5], inj, fac)
-                    if Fi is not None:
-                        Zi = running_median(norm(Fi, te[1]), te[3], avg)
-                        r[f"detect_x{fac}"] = float((score(Zi)[inj] > thr).mean())
-                row[dname] = r
-            # leave-one-duty-out false alarms (unseen speed)
-            lodo = {}
-            for d in lodo_duties:
-                keep = tr[2] != d
-                if keep.sum() < 100 or not (te[2] == d).any():
-                    continue
-                n2 = SpeedNorm(tr[0][keep], tr[1][keep], tr[2][keep], tr[4][keep], avg)
-                Z2 = running_median(n2(tr[0][keep], tr[1][keep]), tr[3][keep], avg)
-                kth = th[2] != d
-                Z2th = running_median(n2(th[0][kth], th[1][kth]), th[3][kth], avg)
-                Z2te = running_median(n2(te[0], te[1]), te[3], avg)
-                d2 = detectors(Z2, 1)
-                for dname in ("max|z|", "Mahalanobis", "AE seed 0"):
-                    thr = np.quantile(d2[dname](Z2th), 0.99)
-                    lodo.setdefault(dname, {})[d] = round(100 * float((d2[dname](Z2te)[te[2] == d] > thr).mean()), 2)
+            row, lodo = evaluate(tabs, train_idx, th_idx, test_idx, duties, set_name, avg, args.seeds, lodo_duties)
             res[f"{set_name} | avg {avg}"] = {"detectors": row, "leave_one_duty_out_FA_pct": lodo}
             # print compact
             print(f"\n== {set_name} | running median of {avg} window(s)")
@@ -246,6 +323,7 @@ def main():
                   + " / ".join(f"{100 * np.mean(det[f]):5.1f}" for f in (1.25, 1.5, 2.0))
                   + f"   unseen-duty FA {lodo.get('AE seed 0')}")
     res["_config"] = {"duties": list(duties), "lodo": lodo_duties, "avg": args.avg, "seeds": args.seeds,
+                      "spread_floor": SPREAD_FLOOR, "long_windows": "acc_axis_long" in tabs[0],
                       "threshold_session": str(tabs[th_idx]["name"]),
                       "train": [str(tabs[i]["name"]) for i in train_idx],
                       "test": [str(tabs[i]["name"]) for i in test_idx]}
