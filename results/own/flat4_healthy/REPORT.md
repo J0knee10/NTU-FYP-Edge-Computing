@@ -166,6 +166,38 @@ A ×1.5 fault is +0.18 log10. The change starts around 16:00 and grows to 19:00 
 3. Skip windows whose tach speed jumps, using past data only as the reference, and count them. A speed that keeps leaving the band is itself a symptom and should raise its own flag (a rubbing or stalling fan slows down).
 4. Expect slow drift of the healthy 1× (×0.7 in an afternoon here). That is the agent's ADAPT job, and it is why a single-window detector can't tell a slow fault from drift. Persistence over several windows is needed before an ALERT.
 
+## Overnight 20 Nov (00:36–07:56): the drift is slow and has levelled off
+
+A second healthy campaign on the same mount (22 sessions, logger 0.3.2, nobody touching the fan), after the 25
+pre-night `ab_block` blocks (`results/own/prenight_20261119/`). There are now 53 campaign sessions in this folder.
+
+- **Checks:** 20 sessions OK. Two WARNs, both the drift below crossing the 30 % line against the 09:04
+  reference: in-plane+axial 1× −31 % at 80 % (02:49) and −31 % at 60 % (07:46, the erratic step). There were
+  short knocks (4–10 high-frequency bumps) in four sessions. Tach rejects were 1.1–1.6 %.
+- **The 1× fell slowly from the morning and has been flat since about 00:30.** It was not a step at 16:00. The
+  median of the 0.62 s per-axis 1× on the sweep-type sessions:
+
+  | Time | In-plane 70 % (mg) | In-plane 80 % | Axial 70 % | Axial 80 % | rpm at 70 % |
+  |---|---|---|---|---|---|
+  | 19 Nov 09:04–10:35 | 1.97–2.24 | 3.68–4.29 | 8.9–9.4 | 17.8–21.4 | 1749–1761 |
+  | 19 Nov 12:02–15:50 | 1.96–2.10 | 3.60–3.87 | 8.6–9.1 | 17.6–18.7 | 1753–1769 |
+  | 19 Nov 17:17–19:02 | 2.03–2.06 | 3.51–3.61 | 8.1–8.5 | 15.0–16.1 | 1746–1761 |
+  | 20 Nov 00:36–07:46 | 1.70–1.87 | 3.07–3.44 | 7.4–8.0 | 13.3–15.0 | 1733–1751 |
+
+  - Overnight against the morning: axial 1× at 80 % ×0.75, in-plane ×0.85, speed at 70 % about −0.7 %.
+    Within the night it stays within ±5 %.
+  - The cause is unknown. Plausible ones are the new fan running in (fluid bearing), the taped corners
+    settling, or temperature: the board read 21.5–22.5 °C overnight against 23.5–24 °C in the morning (tape
+    stiffness and bearing oil both depend on it). The light sensor doesn't track it (dark again after 04:00,
+    the 1× stayed low).
+- **What it means:**
+  - The healthy baseline of one fan on one mount moved by about a ×1.5 fault's size over 15 h of running,
+    then settled. That is a real example of the benign drift the RL agent has to ADAPT to, not a fault.
+  - The A-B-A design is unaffected: consecutive blocks are 15 min apart, and the pre-night block-to-block
+    spread already includes the evening part of the drift.
+  - The per-window models in this folder should be retrained on all 53 sessions before the fault blocks (the
+    protocol says: every healthy `flat4` campaign session recorded before the part).
+
 ## Unseen speeds
 
 Smooth healthy curves did not make unseen speeds easy:
