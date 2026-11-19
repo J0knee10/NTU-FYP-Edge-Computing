@@ -1,6 +1,13 @@
-# Bench setup (current, since 18 Nov 2026)
+# Bench setup
 
-![tapeCorner setup](2026-11-19_tapeCorner.jpg)
+| Mount id | Fan placement | Used | Status |
+|---|---|---|---|
+| `tapeCorner` | Standing on its edge, free on the floor; board taped on the frame's top edge | 18–19 Nov 2026 (bring-up, 7.4 h healthy overnight campaign) | Retired 19 Nov |
+| (new, e.g. `flat4`) | Lying flat on four corner supports, blowing up; board on a side wall | From 19 Nov 2026 | Being set up: photo and axes to be added |
+
+The rest of this page describes `tapeCorner` (standing).
+
+![tapeCorner setup, fan standing on its edge](2026-11-19_tapeCorner_standing.jpg)
 
 ## Fan `pc01`
 
