@@ -87,6 +87,46 @@ Things to decide, and how:
 4. Write the chosen values into `DEFAULT_SPEC` in `host/features/spec.py`, rerun the tests and
    record the decision in `docs/implementation_plan.md`.
 
+## Draft spec from our own data (19 Nov 2026, proposal, not yet decided)
+
+The evidence is from two healthy campaigns, `tapeCorner` and `flat4` (reports in `results/own/overnight/` and `results/own/flat4_healthy/`), tested with `host/analysis/feature_eval.py` (session-held-out thresholds, rotated; synthetic in-plane 1× changes). Confirm after the Blu-Tack night: real faults decide it.
+
+**What the data says:**
+- **Fixed-Hz bands fail at unseen speeds.** Leaving out one duty gives 100 % false alarms with Mahalanobis or the autoencoder at every left-out duty; max|z| varies with the threshold session. Order features of the tach speed fail less often, but not reliably (0–100 % depending on the duty, see "Some speeds stay hard" below).
+- **Features must be per axis.** Summing x, y, z (vector order amplitudes) hides an in-plane change: ≤ 7 % detection at ×2 on both mounts.
+- **Windows must be long.**
+  - On the quiet `flat4` mount the fan's own 1× is near the background in a 0.62 s window below about 60 % speed.
+  - A 5 s (4096-sample) tach-locked window narrows the band, so a stable 1× line shows from 50 % up.
+  - Result: with an 8-window running median, ×1.5 in-plane is caught 90–99 % of the time at 70–80 %, against 20–30 % with 0.62 s windows, at about 2 % false alarms.
+- **Speed-conditioned normalisation works.** Each feature's healthy median and spread is learned per duty and interpolated in log rpm, with the spread = within- and between-session spread combined. On the board this is one small table per feature.
+- **Some speeds stay hard.** At 30–40 % there is no 1× above the background even at 10 s, because imbalance force scales with ω². An unseen speed between grid points still raises false alarms. Both are jobs for the RL agent: speed as context, ADAPT at a new speed.
+
+**Draft feature vector (11 features per window):**
+
+| # | Feature | Window |
+|---|---|---|
+| 0–2 | accel 1× RMS, board x, y, z | 4096 samples, tach-locked, ±2 bins (0.4 Hz) |
+| 3 | accel 2×, largest axis | 4096 |
+| 4 | accel 0.5×, largest axis | 4096 |
+| 5 | accel 7× (blade pass), largest axis | 4096 |
+| 6 | accel 12× (motor), all axes | 512 |
+| 7 | accel 150–400 Hz band RMS | 512 |
+| 8–10 | gyro 1× RMS, x, y, z | 4096 |
+
+All are log10, normalised by the speed table, then scored by max|z| or a small autoencoder, after a running median over about 9 s. The speed comes from the tach (logger ≥ 0.3.2).
+
+**Board cost (estimate, to measure in step 5):**
+- **FFT approach:**
+  - **RAM:** a 4096-sample int16 ring buffer for accel and gyro is 48 KB, plus a 16 KB float FFT buffer.
+  - **CPU:** CMSIS `arm_rfft_fast_f32` at 4096 points per axis, 6 per 0.62 s hop, is roughly 10 ms of CPU per hop (about 2 %).
+- **Streaming approach (no sample buffer):** non-overlapping 5 s windows with a running single-bin DFT per order and axis, and a median over 3 windows (about 15 s). This variant has not been evaluated yet.
+
+**Still to do:**
+- Re-run on the real fault blocks (`fault_eval.py`).
+- Evaluate the streaming variant.
+- Check the 60 % step after the anti-alias firmware (0.4.0).
+- Port into `host/features/` (`spec.py`, `extract.py`) once decided.
+
 ## How to tell it worked
 
 ```
