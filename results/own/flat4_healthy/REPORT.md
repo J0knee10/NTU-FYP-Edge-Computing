@@ -98,6 +98,46 @@ The synthetic test also overstates the problem at low speed. Multiplying a backg
 - **A spread floor of 0.03 log10** (`feature_eval_grid10L_rot_f03.json`, made before the review fixes) hurt detection. Don't use a uniform floor.
 - **False alarms per window are not per hour.** 2 % of 0.62 s windows is about 116 flags an hour; 2 % of 5 s windows is about 14 an hour. A single flag can't trigger ALERT. Persistence over several windows, which is in the RL state, has to do that work.
 
+## Full day (31 sessions) and a calibration that works (19 Nov, evening)
+
+The campaign ended at 19:12 with 31 sessions, all passing `session_check.py`. Every number in this section uses the same split: the first 19 sessions (09:04–15:01) train and the last 12 (15:01–19:02) test, so the test is a later part of the day.
+
+**Rotated thresholds, 31 sessions** (`feature_eval_grid10L_rot_all.json`, 8-window median). At matched 2 % false alarms, ×1.5 at 70 / 80 %:
+
+| Set | max\|z\| | Mahalanobis |
+|---|---|---|
+| L | 100 / 100 % | 97 / 100 % |
+| O | 27 / 86 % | 41 / 92 % |
+
+L's lead holds and is clearest at 70 %; at 80 % O catches up with more training data. With one held-out threshold session, Mahalanobis and the autoencoder give 11–18 % false alarms on average with an 8-window median (up to 54 %): their false alarms grow through the afternoon (set L, per test session: about 1–6 % up to 16:06, then 6–27 % from 16:17 on, about 15 % or more in seven of those eight sessions), while max|z| stays below 10 % in every test session. They react to slow drift through the day; max|z| on per-feature z-scores is more robust.
+
+**Leave-one-session-out (LOSO) calibration** (`feature_eval.py --loso`, `feature_eval_grid10L_loso.json`):
+- **How it works.** No single threshold session. Each training session is scored by a model fitted on the other training sessions. The threshold is a high percentile of all those out-of-session scores pooled. A device could do the same with several healthy calibration sessions, and no oracle is involved.
+
+| Set, detector | Threshold (percentile) | False alarms, all test (worst session) | ×1.5 overall | ×1.5 at 70 / 80 % |
+|---|---|---|---|---|
+| **L, max\|z\|** | **99.5** | **1.3 % (5.3 %)** | 51 % | **100 / 100 %** |
+| L, max\|z\| | 99 | 2.4 % (6.9 %) | 53 % | 100 / 100 % |
+| L, Mahalanobis | 99.5 | 2.1 % (8.5 %) | 54 % | 99 / 100 % |
+| O, max\|z\| | 99 | 1.0 % (6.1 %) | 20 % | 9 / 76 % |
+| O, Mahalanobis | 99 | 7.6 % (29.9 %) | 52 % | 86 / 99 % |
+| L streaming (median of 3), max\|z\| | 99.5 | 1.1 % (4.7 %) | 48 % | 79 / 97 % |
+
+- **This fixes the unstable false alarms of the single-session threshold** for L with max|z|: about 1 % overall and at most about 5 % in any test session, while every ×1.5 change at 70–80 % is still caught.
+- **On `tapeCorner` the same method first failed.** The pooled 99.5th percentile sat far out (26 vs 6 on `flat4`): ×2 dropped from 99.9 % at the 99th percentile to 1.8 % at the 99.5th.
+  - **The cause was speed glitches, not the method.** In some overnight sessions the speed read about 5 % high for a few seconds (for example 1365 vs 1300 rpm at 50 %), then returned. It is likely a logger 0.3.1 tach glitch.
+  - A 5 s narrowband feature measures ±0.4 Hz around the tach speed, so a wrong speed puts it on the wrong bin, and z reached about 150.
+  - **Speed gate** (`--speed-gate 0.03`): drop rows more than 3 % off their visit's median speed, plus the 4 rows either side.
+- **Results with the gate:**
+  - **`tapeCorner`** (`results/own/overnight/feature_eval_L_loso_gate.json`), L max|z| at the 99.5th percentile: 4.6 % false alarms (worst session 13.5 %), ×1.5 caught 99.5 %, ×1.25 29 %. The higher false alarms are overnight drift on that mount.
+  - **`flat4`** (logger 0.3.2, `feature_eval_grid10L_loso_gate.json`): the gate changes nothing; this data has no such glitches.
+- **For the device:**
+  1. calibrate the threshold on pooled out-of-session scores from several healthy sessions;
+  2. score with max|z| on the 5 s order features;
+  3. skip any window whose tach speed jumps.
+
+  The leftover false-alarm rate (1–5 % per window) still needs persistence (several windows in a row) before an ALERT, and slow drift needs the agent's ADAPT.
+
 ## Unseen speeds
 
 Smooth healthy curves did not make unseen speeds easy:
@@ -119,6 +159,8 @@ Learning a new speed stays an RL-agent role (ADAPT at a new speed) rather than s
 - `feature_eval_grid10L_rot.json`: the same with the threshold session rotated.
 - `feature_eval_grid10L_rot_f03.json`: rotated, with a 0.03 spread floor (before the review fixes).
 - `feature_eval_grid10L_rot_avg16.json`, `feature_eval_grid10L_rot_sub8.json`: 16-window median; streaming.
+- `feature_eval_grid10L_rot_all.json`: rotated, all 31 sessions.
+- `feature_eval_grid10L_loso.json`, `_loso_sub8.json`, `_loso_gate.json`: leave-one-session-out calibration (8-window median; streaming; with the speed gate).
 - To rebuild:
   - `ANALYSIS_OUT=results/own/flat4_healthy python host/analysis/long_windows.py`
   - then `feature_eval.py --rotate --max-sessions 18 --tag grid10L_rot`.

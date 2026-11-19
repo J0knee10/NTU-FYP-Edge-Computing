@@ -1,7 +1,7 @@
 """Feature-set and detector evaluation with session-level validation (step 1 groundwork).
 
 usage: python host/analysis/feature_eval.py [--seeds 3] [--avg 8] [--duties 300:800:100] [--lodo 400:800]
-           [--rotate] [--subsample 8] [--max-sessions N] [--spread-floor 0.001] [--tag name]
+           [--rotate | --loso] [--speed-gate 0.03] [--subsample 8] [--max-sessions N] [--spread-floor 0.001] [--tag name]
 
 Reads the window tables under ANALYSIS_OUT (healthy campaign sessions only), in time order.
 
@@ -17,6 +17,11 @@ Method:
   the block trains. Test on the remaining sessions.
 - **Rotation.** `--rotate` repeats the test with each sweep-type training session as the threshold session
   and reports mean [min-max]: one threshold session alone makes the numbers swing.
+- **Leave-one-session-out calibration.** `--loso`: no held-out threshold session. Each training session is
+  scored by a model (normalisation + detector) fitted on the other training sessions; the threshold is a high
+  percentile (99, 99.5, 99.9) of all those out-of-session scores pooled. The final model uses every training
+  session. This is the calibration a device could use: several healthy sessions, no oracle. max|z| and
+  Mahalanobis only (the autoencoder would need one fit per session).
 - **Matched false alarms.** To compare feature sets fairly, detection is also reported at a threshold that
   gives 2 % false alarms on the healthy test windows (an oracle threshold, for comparison only).
 - **Synthetic faults.** Multiply the in-plane accelerometer 1x (board x and z) of test windows at 40-80 %
@@ -27,10 +32,14 @@ Method:
   tach-locked per-axis orders, and every set is scored on the same rows (whole long window settled).
 - **Subsampling.** `--subsample 8` keeps every 8th row: with 4096-sample long windows that is non-overlapping
   5 s windows, as a streaming single-bin DFT on the board would give (no sample buffer).
+- **Speed gate.** `--speed-gate 0.03` drops rows whose tach speed is more than 3 % off the median of their
+  visit to a duty step, and the 4 rows either side (the span of a 5 s window). Logger 0.3.1 tach glitches
+  (a few seconds at +5 %) put the narrowband 5 s features on the wrong bin and gave z up to ~150.
 - **Detectors** on the z-scores: max |z|, Mahalanobis distance, and the MLP autoencoder (several seeds).
 History: 19 Nov afternoon, after a methods review: spread measured on medianed features (was a 1.25/sqrt(avg)
 factor that assumed independent windows), median over all settled rows with full-median rows scored, visits
-split, matched-false-alarm comparison, healthy sessions only.
+split, matched-false-alarm comparison, healthy sessions only. Evening: --loso (31 sessions: one held-out session
+gave unstable false alarms; pooled out-of-session scores did not).
 """
 import argparse
 import glob
@@ -50,6 +59,7 @@ INPLANE = (0, 2)  # board x, z = rotor plane (same on tapeCorner and flat4)
 SPREAD_FLOOR = 1e-3  # log10 units; --spread-floor
 SUBSAMPLE = 1  # --subsample k: keep every k-th row (8 with 512-sample rows = non-overlapping 4096 windows)
 MATCHED_FA = 0.02
+SPEED_GATE = 0.0  # --speed-gate: max relative speed deviation from the visit median (0 = off)
 
 
 def load():
@@ -177,6 +187,19 @@ def detectors(Ztr, seeds):
     return dets
 
 
+def speed_outliers(t, frac, span=9):
+    """Rows whose speed is more than frac off the median of their visit to a duty step (settled rows), widened by
+    span // 2 rows each side (a 5 s window spans 9 rows): a speed-plausibility gate."""
+    rpm, pwm, st = t["rpm"], t["pwm"], t["settled"]
+    visit = np.cumsum(np.r_[True, np.diff(pwm) != 0])
+    bad = np.zeros(len(rpm), bool)
+    for v in np.unique(visit):
+        m = (visit == v) & st & np.isfinite(rpm)
+        if m.sum() >= 5:
+            bad |= m & (np.abs(rpm / np.median(rpm[m]) - 1) > frac)
+    return np.convolve(bad.astype(int), np.ones(span, int), mode="same") > 0
+
+
 def gather(tabs, sel, set_name, duties, avg=1, fac=None):
     """Running-medianed features of the selected sessions, for the rows that are scored.
 
@@ -190,6 +213,8 @@ def gather(tabs, sel, set_name, duties, avg=1, fac=None):
         t = tabs[i]
         base = t["settled"] & np.isfinite(t["rpm"]) & np.isin(t["pwm"], duties)
         base &= np.arange(len(base)) % SUBSAMPLE == 0
+        if SPEED_GATE:
+            base &= ~speed_outliers(t, SPEED_GATE)
         idx = np.nonzero(base)[0]
         if len(idx) == 0:  # e.g. a steady session at a duty outside the grid
             continue
@@ -259,6 +284,51 @@ def evaluate(tabs, train_idx, th_idx, test_idx, duties, set_name, avg, seeds, lo
     return row, lodo
 
 
+LOSO_Q = (0.99, 0.995, 0.999)
+
+
+def loso(tabs, train_idx, test_idx, duties, set_name, avg):
+    """Threshold from leave-one-session-out scores pooled over the training sessions (see module docstring)."""
+    dnames = ("max|z|", "Mahalanobis")
+    oos = {d: [] for d in dnames}
+    for s in train_idx:
+        g = gather(tabs, [s], set_name, duties, avg)
+        if len(g[0]) == 0:
+            continue
+        tr = gather(tabs, [i for i in train_idx if i != s], set_name, duties, avg)
+        norm = SpeedNorm(*tr)
+        dets = detectors(norm(tr[0], tr[1]), 0)
+        for d in dnames:
+            oos[d].append(dets[d](norm(g[0], g[1])))
+    tr = gather(tabs, train_idx, set_name, duties, avg)
+    te = gather(tabs, test_idx, set_name, duties, avg)
+    norm = SpeedNorm(*tr)
+    dets = detectors(norm(tr[0], tr[1]), 0)
+    Zte = norm(te[0], te[1])
+    inj = (te[2] >= 400) & (te[2] <= 800)
+    Zi = {}
+    for fac in (1.25, 1.5, 2.0):
+        g = gather(tabs, test_idx, set_name, duties, avg, fac)
+        if g is not None:
+            Zi[fac] = norm(g[0], g[1])
+    out = {"calibration_sessions": len(oos[dnames[0]])}
+    for d in dnames:
+        sc = np.concatenate(oos[d])
+        s_te = dets[d](Zte)
+        for q in LOSO_Q:
+            thr = float(np.quantile(sc, q))
+            fa_s = {str(tabs[k]["name"]): round(100 * float((s_te[te[3] == k] > thr).mean()), 2) for k in np.unique(te[3])}
+            r = {"threshold": thr, "FA_test": 100 * float((s_te > thr).mean()), "FA_per_session": fa_s,
+                 "FA_session_max": max(fa_s.values())}
+            for fac, Z in Zi.items():
+                hit = dets[d](Z) > thr
+                r[f"detect_x{fac}"] = 100 * float(hit[inj].mean())
+                r[f"detect_x{fac}_per_duty"] = {int(dd): round(100 * float(hit[inj & (te[2] == dd)].mean()), 1)
+                                                for dd in np.unique(te[2][inj])}
+            out[f"{d} q{q}"] = r
+    return out
+
+
 def rotate(tabs, ntr, sweepish, test_idx, duties, avgs, seeds):
     """Repeat the evaluation with each sweep-type training session in turn as the threshold session."""
     out = {}
@@ -300,7 +370,7 @@ def rotate(tabs, ntr, sweepish, test_idx, duties, avgs, seeds):
 
 
 def main():
-    global SPREAD_FLOOR, SUBSAMPLE
+    global SPREAD_FLOOR, SUBSAMPLE, SPEED_GATE
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", type=int, default=3)
     ap.add_argument("--avg", type=int, default=8)
@@ -311,11 +381,14 @@ def main():
     ap.add_argument("--tag", default="", help="suffix for the output file name")
     ap.add_argument("--spread-floor", type=float, default=1e-3, help="minimum spread per feature, log10 units")
     ap.add_argument("--rotate", action="store_true", help="each sweep-type training session as threshold session in turn")
+    ap.add_argument("--speed-gate", type=float, default=0.0, help="drop rows >frac off their visit's median speed")
+    ap.add_argument("--loso", action="store_true", help="threshold from pooled leave-one-session-out scores")
     ap.add_argument("--subsample", type=int, default=1, help="keep every k-th window row (emulates a longer hop)")
     ap.add_argument("--max-sessions", type=int, help="use only the first N sessions (reproduce an earlier split)")
     args = ap.parse_args()
     SPREAD_FLOOR = args.spread_floor
     SUBSAMPLE = args.subsample
+    SPEED_GATE = args.speed_gate
     a, b, c = (int(v) for v in args.duties.split(":"))
     duties = tuple(range(a, b + 1, c))
     lo, hi = (int(v) for v in args.lodo.split(":"))
@@ -333,9 +406,29 @@ def main():
     print(f"{n} sessions; train {len(train_idx)}, threshold session {tabs[th_idx]['name']} "
           f"({tabs[th_idx]['profile']}), test {len(test_idx)}; duties {duties}, left out in turn {lodo_duties}")
     config = {"duties": list(duties), "avg": args.avg, "seeds": args.seeds, "spread_floor": SPREAD_FLOOR,
-              "subsample": SUBSAMPLE, "long_windows": "acc_axis_long" in tabs[0], "matched_fa": MATCHED_FA,
+              "subsample": SUBSAMPLE, "speed_gate": SPEED_GATE, "long_windows": "acc_axis_long" in tabs[0], "matched_fa": MATCHED_FA,
               "sessions": [str(t["name"]) for t in tabs], "test": [str(tabs[i]["name"]) for i in test_idx]}
-    if args.rotate:
+    if args.loso:
+        res = {}
+        train_all = list(range(ntr))
+        print(f"leave-one-session-out calibration over the {ntr} training sessions; test {len(test_idx)}")
+        for avg in sorted({1, args.avg}):
+            for set_name in feature_sets(tabs[0]):
+                if set_name.startswith("A"):
+                    continue
+                r = loso(tabs, train_all, test_idx, duties, set_name, avg)
+                res[f"{set_name} | avg {avg}"] = r
+                print(f"\n== {set_name} | avg {avg} ({r['calibration_sessions']} calibration sessions)")
+                for k, v in r.items():
+                    if k == "calibration_sessions":
+                        continue
+                    print(f"  {k:18s} FA {v['FA_test']:5.2f} % (worst session {v['FA_session_max']:5.1f})   detect"
+                          + "".join(f"  x{f}: {v.get(f'detect_x{f}', np.nan):5.1f}" for f in (1.25, 1.5, 2.0))
+                          + "   x1.5 by duty: " + " ".join(f"{d // 10}%:{p:.0f}"
+                                                          for d, p in v.get("detect_x1.5_per_duty", {}).items()))
+        res["_config"] = {**config, "loso": True, "train": [str(tabs[i]["name"]) for i in train_all],
+                          "quantiles": list(LOSO_Q)}
+    elif args.rotate:
         print(f"rotating the threshold session over {[str(tabs[i]['name']) for i in sweepish]}")
         res = rotate(tabs, ntr, sweepish, test_idx, duties, sorted({1, args.avg}), args.seeds)
         res["_config"] = {**config, "rotate": True, "threshold_sessions": [str(tabs[i]["name"]) for i in sweepish]}

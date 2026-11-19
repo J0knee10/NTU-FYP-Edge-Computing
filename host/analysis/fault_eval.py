@@ -1,7 +1,7 @@
 """Score real fault blocks with detectors trained on a healthy campaign (secondary A-B-A analysis).
 
 usage: ANALYSIS_OUT=results/own/abtest_<date> python host/analysis/fault_eval.py --train results/own/flat4_healthy
-           [--avg 8] [--seeds 3] [--exclude 094906 ...] [--tag name]
+           [--avg 8] [--seeds 3] [--exclude 094906 ...] [--speed-gate 0.03] [--tag name]
 
 Training: every campaign table in --train (with long-window sidecars), the same method as feature_eval.py
 (speed-conditioned normalisation, running median of `avg` windows). The alert threshold is the 99th percentile
@@ -48,8 +48,10 @@ def main():
     ap.add_argument("--avg", type=int, default=8)
     ap.add_argument("--seeds", type=int, default=3)
     ap.add_argument("--exclude", nargs="*", default=[], help="training sessions to leave out (name substrings)")
+    ap.add_argument("--speed-gate", type=float, default=0.0, help="see feature_eval.py (0 = off)")
     ap.add_argument("--tag", default="")
     args = ap.parse_args()
+    fe.SPEED_GATE = args.speed_gate
     out_dir = Path(os.environ.get("ANALYSIS_OUT", "results/own/abtest"))
     train = [t for t in load_dir(args.train, True) if not any(e in t["name"] for e in args.exclude)]
     test = load_dir(out_dir, False)

@@ -238,6 +238,13 @@ The evaluation changed in three ways (`feature_eval.py`; details in `results/own
 - **Session-based thresholds are unstable for every set,** worst for streaming with few windows. A device needs a longer calibration or an adaptive threshold.
 - Files: `feature_eval_L_rot.json`, `feature_eval_L_rot_sub8.json`.
 
+**Update, 19 Nov evening: a calibration that works, and a speed gate** (details in `results/own/flat4_healthy/REPORT.md`, "Full day"):
+- **Leave-one-session-out calibration** (`feature_eval.py --loso`): each training session is scored by a model fitted on the others, and the threshold is a percentile of those pooled scores. On this mount it first failed: the pooled 99.5th percentile was 26, and ×2 detection fell to 1.8 %.
+- **The cause was speed glitches.** In several sessions the tach read about 5 % high for a few seconds, then returned (for example 1365 vs 1300 rpm at 50 %), probably a logger 0.3.1 glitch. A 5 s narrowband feature then sits on the wrong bin, and z reaches about 150.
+- **Speed gate** (`--speed-gate 0.03`): drop rows more than 3 % off their visit's median speed, plus the 4 rows either side.
+- **With the gate,** L max|z| at the 99.5th percentile gives 4.6 % false alarms (worst session 13.5 %) and catches ×1.5 99.5 % of the time (`feature_eval_L_loso_gate.json`). The higher false alarms are overnight drift on this mount.
+- Files: `feature_eval_L_loso.json`, `feature_eval_L_loso_gate.json`.
+
 ## 8. Placement verdict (`tapeCorner`, retired 19 Nov)
 
 The fan was moved to the flat `flat4` mount on the morning of 19 Nov, which removed the rocking described below (see `docs/setup/bench_setup.md`). At the time the verdict was to keep the tape placement for the fault test. It passed everything that matters:
