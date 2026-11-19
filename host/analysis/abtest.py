@@ -10,6 +10,11 @@ Primary measure: in-plane accelerometer 1x, sqrt(x^2 + z^2) for flat4 (rotor pla
 Effect of a B block: its value / geometric mean of the nearest A block before and after it.
 Null distribution: ratios between consecutive A blocks; z = log(B/A) / sd(log A-to-A ratios).
 Severity strings like "0.1g@25mm" give unbalance U = m * r in g*mm for the dose-response.
+Also one combined effect per block over 50-80 % (inverse-variance weighted by the A-to-A spread, floored at
+0.02 log10), and the
+same tables for secondary measures: axial accel 1x (the board axis not in --inplane), accel 1x over all
+axes, gyro 1x over all axes. Added 19 Nov after a healthy dry run on flat4, before any fault data: the
+60 % step is speed-sensitive there (x 1x changed 1.5x for a 1.2 % speed change) and the 1x is mostly axial.
 """
 import argparse
 import json
@@ -57,6 +62,9 @@ def block(sd, inplane):
                 r[f"{name}{k}x"] = v
             ip = [AX[c] for c in inplane]
             r[f"{name}_inplane"] = float(np.sqrt(sum(r[f"{name}1x"][a] ** 2 for a in ip)))
+            ax_ = [a for a in range(3) if a not in ip]
+            r[f"{name}_axial"] = float(np.sqrt(sum(r[f"{name}1x"][a] ** 2 for a in ax_)))
+            r[f"{name}_vec"] = float(np.sqrt(sum(v ** 2 for v in r[f"{name}1x"])))
         key = seg["label"]
         rows[key] = {"duty": d, **r}
     kind = "A" if meta.get("fault") == "normal" else "B"
@@ -80,43 +88,72 @@ for b in blocks:
     print(f"{lab:>36} {b['kind']:>4} {b['U']:7.2f} " + " ".join(
         f"{b['steps'].get(k, {}).get('acc_inplane', np.nan):9.2f}" for k in steps))
 
-# null: consecutive A-to-A log ratios
 A = [i for i, b in enumerate(blocks) if b["kind"] == "A"]
-null = {k: [] for k in steps}
-for i, j in zip(A[:-1], A[1:]):
-    for k in steps:
-        a, c = blocks[i]["steps"].get(k, {}).get("acc_inplane"), blocks[j]["steps"].get(k, {}).get("acc_inplane")
-        if a and c:
-            null[k].append(np.log10(c / a))
-sd_null = {k: (float(np.std(v, ddof=1)) if len(v) > 1 else np.nan) for k, v in null.items()}
-print("\nA-to-A spread (sd of log10 ratio): " + " ".join(f"{k} {v:.3f}" for k, v in sd_null.items()))
+COMBINE = ("duty50", "duty60", "duty70", "duty80")  # steps pooled into one effect per block (decided 19 Nov, before fault data)
+# Floor on the A-to-A spread: with few A blocks a step can show a tiny spread by chance (z in the hundreds).
+# 0.02 log10 (about 5 %) is the best step-to-step repeatability seen on healthy flat4 sweeps (19 Nov).
+SD_FLOOR = 0.02
+
+
+def effects(measure, verbose=True):
+    """Ratio of each B block to its neighbouring A blocks for one per-step measure, z vs the A-to-A spread,
+    and one combined effect over COMBINE, weighted by 1 / sd^2 of each step's A-to-A log ratio. The combined
+    z treats steps as independent; a drift common to all steps makes it optimistic."""
+    null = {k: [] for k in steps}
+    for i, j in zip(A[:-1], A[1:]):  # consecutive A-to-A log ratios
+        for k in steps:
+            a, c = blocks[i]["steps"].get(k, {}).get(measure), blocks[j]["steps"].get(k, {}).get(measure)
+            if a and c:
+                null[k].append(np.log10(c / a))
+    sd_null = {k: (float(np.std(v, ddof=1)) if len(v) > 1 else np.nan) for k, v in null.items()}
+    if verbose:
+        print(f"\nA-to-A spread of {measure} (sd of log10 ratio, z uses max(sd, {SD_FLOOR})): "
+              + " ".join(f"{k} {v:.3f}" for k, v in sd_null.items()))
+    res = []
+    for i, b in enumerate(blocks):
+        if b["kind"] != "B":
+            continue
+        before = [j for j in A if j < i]
+        after = [j for j in A if j > i]
+        refs = ([before[-1]] if before else []) + ([after[0]] if after else [])
+        cells, num, den = [], 0.0, 0.0
+        for k in steps:
+            v = b["steps"].get(k, {}).get(measure)
+            ref = [blocks[j]["steps"].get(k, {}).get(measure) for j in refs]
+            ref = [r for r in ref if r]
+            if not v or not ref:
+                cells.append(f"{'-':>15}")
+                continue
+            lr = np.log10(v) - np.mean(np.log10(ref))
+            sd = max(sd_null[k], SD_FLOOR) if np.isfinite(sd_null[k]) else np.nan
+            z = lr / sd if np.isfinite(sd) and sd > 0 else np.nan
+            if k in COMBINE and np.isfinite(z):
+                num += lr / sd ** 2
+                den += 1 / sd ** 2
+            cells.append(f"x{10 ** lr:5.2f} z{z:+6.1f}")
+            res.append({"measure": measure, "block": b["name"], "severity": b["severity"], "U": b["U"], "step": k,
+                        "rpm": b["steps"][k]["rpm"], "ratio": float(10 ** lr), "z": float(z)})
+        comb = (float(10 ** (num / den)), float(num / np.sqrt(den))) if den else (np.nan, np.nan)
+        res.append({"measure": measure, "block": b["name"], "severity": b["severity"], "U": b["U"], "step": "combined",
+                    "ratio": comb[0], "z": comb[1]})
+        if verbose:
+            print(f"{b['name'][9:15]} {b['severity']:>12}: " + " ".join(cells)
+                  + f"  | combined 50-80 % x{comb[0]:5.2f} z{comb[1]:+6.1f}")
+    return sd_null, res
+
 
 print("\neffect of each B block: ratio to the geometric mean of the nearest A before and after (z vs A-to-A spread)")
-results = []
-for i, b in enumerate(blocks):
-    if b["kind"] != "B":
-        continue
-    before = [j for j in A if j < i]
-    after = [j for j in A if j > i]
-    refs = ([before[-1]] if before else []) + ([after[0]] if after else [])
-    cells = []
-    for k in steps:
-        v = b["steps"].get(k, {}).get("acc_inplane")
-        ref = [blocks[j]["steps"].get(k, {}).get("acc_inplane") for j in refs]
-        ref = [r for r in ref if r]
-        if not v or not ref:
-            cells.append(f"{'-':>15}")
-            continue
-        lr = np.log10(v) - np.mean(np.log10(ref))
-        z = lr / sd_null[k] if np.isfinite(sd_null[k]) and sd_null[k] > 0 else np.nan
-        cells.append(f"x{10 ** lr:5.2f} z{z:+6.1f}")
-        results.append({"block": b["name"], "severity": b["severity"], "U": b["U"], "step": k,
-                        "rpm": b["steps"][k]["rpm"], "ratio": float(10 ** lr), "z": float(z)})
-    print(f"{b['name'][9:15]} {b['severity']:>12}: " + " ".join(cells))
+sd_null, results = effects("acc_inplane")
+secondary = {}
+for m in ("acc_axial", "acc_vec", "gyr_vec"):
+    print(f"\nsecondary: {m}")
+    secondary[m] = effects(m)
 
 out = Path(args.out) if args.out else Path("results/own/abtest") / f"{Path(args.sessions[0]).name}.json"
 out.parent.mkdir(parents=True, exist_ok=True)
-out.write_text(json.dumps({"blocks": blocks, "null_sd": sd_null, "effects": results}, indent=1, default=float))
+out.write_text(json.dumps({"blocks": blocks, "null_sd": sd_null, "effects": results,
+                           "secondary": {m: {"null_sd": v[0], "effects": v[1]} for m, v in secondary.items()}},
+                          indent=1, default=float))
 print("\nwrote", out)
 
 if args.fig and results:
@@ -135,7 +172,7 @@ if args.fig and results:
     ax[0].set_ylabel("in-plane accel 1x, B / A")
     ax[0].legend(fontsize=8)
     for sev in sorted({r["severity"] for r in results}):
-        rr = sorted([r for r in results if r["severity"] == sev], key=lambda r: r["rpm"])
+        rr = sorted([r for r in results if r["severity"] == sev and r["step"] != "combined"], key=lambda r: r["rpm"])
         ax[1].plot([(r["rpm"] / 60 * 2 * np.pi) ** 2 for r in rr], [r["ratio"] for r in rr], "o-", label=sev)
     ax[1].set_xlabel("omega^2 (rad^2/s^2)")
     ax[1].set_ylabel("B / A")

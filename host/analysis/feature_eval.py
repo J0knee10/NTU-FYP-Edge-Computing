@@ -1,6 +1,6 @@
 """Feature-set and detector evaluation with session-level validation (step 1 groundwork).
 
-usage: python host/analysis/feature_eval.py [--seeds 5] [--avg 8]
+usage: python host/analysis/feature_eval.py [--seeds 5] [--avg 8] [--duties 300:800:100] [--lodo 400:800] [--tag fine]
 
 Reads the window tables under ANALYSIS_OUT (campaign sessions only), in time order.
 
@@ -13,7 +13,10 @@ Method:
   session (all duties) is held out to set the alert threshold (99th percentile of its scores); the rest of
   the block trains. Test on the remaining sessions. Neighbouring windows are therefore never on both
   sides of the threshold.
-- **Unseen speeds.** Leave one duty (40-80 %) out of training, then test false alarms at that duty.
+- **Duty grid.** `--duties start:stop:step` (permille, inclusive) picks the duties used; 10 % steps by default,
+  5 % steps (`300:1000:50`) when the campaign has fine sweeps.
+- **Unseen speeds.** Leave one duty (in `--lodo`, default 40-80 %) out of training, then test false alarms
+  at that duty. Keep the range inside the grid, so the left-out duty is interpolated, not extrapolated.
 - **Synthetic faults.** Multiply the in-plane accelerometer 1x (board x and z) of test windows at 40-80 %
   by 1.25 / 1.5 / 2 (and optionally gyro 1x too), then count detections at the same threshold.
 - **Detectors** on the residuals: max |z|, Mahalanobis distance, and the MLP autoencoder (several seeds).
@@ -65,7 +68,6 @@ def feature_sets(t):
     }
 
 
-DUTIES = (300, 400, 500, 600, 700, 800)  # 90-100 % excluded: tapeCorner rocked there (a different regime)
 
 
 def inject(set_name, F, ip, inj, fac):
@@ -155,17 +157,25 @@ def main():
     ap.add_argument("--seeds", type=int, default=3)
     ap.add_argument("--avg", type=int, default=8)
     ap.add_argument("--train-frac", type=float, default=0.6)
+    # default 30-80 %: 90-100 % excluded, tapeCorner rocked there (a different regime)
+    ap.add_argument("--duties", default="300:800:100", help="start:stop:step in permille, inclusive")
+    ap.add_argument("--lodo", default="400:800", help="range of duties to leave out in turn, inclusive")
+    ap.add_argument("--tag", default="", help="suffix for the output file name")
     args = ap.parse_args()
+    a, b, c = (int(v) for v in args.duties.split(":"))
+    duties = tuple(range(a, b + 1, c))
+    lo, hi = (int(v) for v in args.lodo.split(":"))
+    lodo_duties = [d for d in duties if lo <= d <= hi]
     tabs = load()
     n = len(tabs)
     ntr = max(3, int(round(args.train_frac * n)))
     # Threshold session: the last sweep-type session (all duties) in the training block, held out.
-    sweepish = [i for i in range(ntr) if str(tabs[i]["profile"]) in ("speed_sweep", "mount_check")]
+    sweepish = [i for i in range(ntr) if str(tabs[i]["profile"]) in ("speed_sweep", "speed_sweep_fine", "mount_check")]
     th_idx = sweepish[-1] if sweepish else ntr - 1
     train_idx = [i for i in range(ntr) if i != th_idx]
     test_idx = list(range(ntr, n))
     print(f"{n} sessions; train {len(train_idx)}, threshold session {tabs[th_idx]['name']} "
-          f"({tabs[th_idx]['profile']}), test {len(test_idx)}")
+          f"({tabs[th_idx]['profile']}), test {len(test_idx)}; duties {duties}, left out in turn {lodo_duties}")
     res = {}
     for avg in sorted({1, args.avg}):
         for set_name in feature_sets(tabs[0]):
@@ -173,7 +183,7 @@ def main():
                 F, lr, duty, grp, ss, ip = [], [], [], [], [], []
                 for i in sel:
                     t = tabs[i]
-                    m = t["settled"] & np.isfinite(t["rpm"]) & np.isin(t["pwm"], DUTIES)
+                    m = t["settled"] & np.isfinite(t["rpm"]) & np.isin(t["pwm"], duties)
                     F.append(feature_sets(t)[set_name][m])
                     lr.append(np.log10(t["rpm"][m]))
                     duty.append(t["pwm"][m])
@@ -191,7 +201,7 @@ def main():
             Zth = running_median(norm(th[0], th[1]), th[3], avg)
             Zte = running_median(norm(te[0], te[1]), te[3], avg)
             # synthetic in-plane 1x faults on test windows at 40-80 %
-            inj = np.isin(te[2], [400, 500, 600, 700, 800])
+            inj = (te[2] >= 400) & (te[2] <= 800)
             Fte_raw = te[0]
             dets = detectors(Ztr, args.seeds)
             row = {}
@@ -208,7 +218,7 @@ def main():
                 row[dname] = r
             # leave-one-duty-out false alarms (unseen speed)
             lodo = {}
-            for d in (400, 500, 600, 700, 800):
+            for d in lodo_duties:
                 keep = tr[2] != d
                 if keep.sum() < 100 or not (te[2] == d).any():
                     continue
@@ -235,8 +245,13 @@ def main():
             print(f"  {'AE (' + str(len(ae_keys)) + ' seeds)':12s} FA {100 * np.mean(fa):5.2f}±{100 * np.std(fa):.2f} %   detect x1.25/1.5/2: "
                   + " / ".join(f"{100 * np.mean(det[f]):5.1f}" for f in (1.25, 1.5, 2.0))
                   + f"   unseen-duty FA {lodo.get('AE seed 0')}")
-    (OUT / "feature_eval.json").write_text(json.dumps(res, indent=1))
-    print("\nwrote", OUT / "feature_eval.json")
+    res["_config"] = {"duties": list(duties), "lodo": lodo_duties, "avg": args.avg, "seeds": args.seeds,
+                      "threshold_session": str(tabs[th_idx]["name"]),
+                      "train": [str(tabs[i]["name"]) for i in train_idx],
+                      "test": [str(tabs[i]["name"]) for i in test_idx]}
+    out = OUT / f"feature_eval{'_' + args.tag if args.tag else ''}.json"
+    out.write_text(json.dumps(res, indent=1))
+    print("\nwrote", out)
 
 
 if __name__ == "__main__":

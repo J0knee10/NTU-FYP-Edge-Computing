@@ -142,6 +142,12 @@ The to-do list lives in `Work/personal-assistant-bot/todos.md`.
   - A simple **max |z|** on speed-normalised per-axis order features detects a doubled in-plane 1× 99.5 % of the time at 1.3 % false alarms. That matches the autoencoder, with fewer false alarms.
   - **Unseen speeds are not solved** at 10 % duty spacing: amplitude vs speed is uneven. The campaign now adds a 5 % sweep, and learning a new speed is a candidate RL role (ADAPT at a new speed).
   - Repeat this on `flat4` and on the real Blu-Tack data.
+- **flat4 feature evaluation (14:30, 18 sessions)**, in [`results/own/flat4_healthy/REPORT.md`](results/own/flat4_healthy/REPORT.md):
+  - The flat mount is quiet in the rotor plane. The in-plane 1× is 0.3–1 mg at 30–60 %, about the background level in a 0.62 s window, so a synthetic ×2 is mostly missed (2–45 %, vs 99.5 % on tapeCorner).
+  - A **5 s tach-locked window** (`host/analysis/window_length.py`) finds a stable 1× line from 50 % up, with 2–8× the background. At 30–40 % there is no 1× above the background.
+  - For step 1: take order amplitudes from long tach-locked windows (a single-bin DFT on the board), and floor each feature's spread.
+  - The 60 % step is erratic with short windows, likely aliasing; check again after 0.4.0.
+- **A-B-A dry run** on healthy flat4 sweeps (fake B blocks) works end to end. `abtest.py` now also prints a combined 50–80 % effect, a spread floor of 0.02, and axial, all-axis and gyro secondaries. Details are in the protocol doc.
 - **Imbalance night plan:** `docs/experiments/2026-11-19_imbalance_ABA.md` (A-B-A with sham and hub-mass controls; `ab_block` profile; analysis `host/analysis/abtest.py`, fixed in advance).
 - **Next firmware change (after tonight):** stop the IMU aliasing of the motor's 24×/36×/48× orders (IMU at 1.66 kHz plus on-board decimation, or the 200 Hz filter). Then re-record the main dataset.
 

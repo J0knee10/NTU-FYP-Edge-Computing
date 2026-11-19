@@ -86,7 +86,27 @@ python host/analysis/abtest.py --inplane xz --fig results/own/abtest/2026-11-19.
 
 - **Primary measure:** in-plane accelerometer 1× RMS, sqrt(x² + z²) in mg. On `flat4` the rotor plane is board x/z. It is measured at 50, 60, 70 and 80 %, from a per-axis Welch spectrum of each step at the tach speed.
 - **Effect:** each B block divided by the geometric mean of the nearest A before and after, compared with the spread of A-to-A ratios (sham and hub control included). It is reported as a ratio and as z.
+- **Combined effect per block:** one ratio and z over the 50, 60, 70 and 80 % steps, weighting each step by 1 / sd² of its A-to-A spread. The spread used in every z is floored at 0.02 log10 (about 5 %), so a step whose few A-to-A ratios happen to agree closely can't give z in the hundreds. The combined z treats steps as independent, so a drift common to all steps makes it optimistic.
 - **Dose-response:** the ratio vs U (g·mm) and vs ω². Below the ~40 Hz bounce of the mount, the added 1× should grow roughly in proportion to U·ω².
 - **Secondary:**
+  - the same tables for axial accel 1× (board y), accel 1× over all axes, and gyro 1× over all axes (`abtest.py` prints them);
   - the autoencoder on order features, trained on healthy `flat4` data with its threshold set on a held-out session; detection rate per mass and duty;
-  - gyro 1×, accel 2× and 0.5×.
+  - accel 2× and 0.5×.
+
+## Dry run on healthy flat4 data (19 Nov, afternoon, before any fault data)
+
+`abtest.py` was run on the five healthy `speed_sweep` sessions of the day, all as A blocks, and then on a copy with fake B blocks.
+
+| Duty | 30 % | 40 % | 50 % | 60 % | 70 % | 80 % | 90 % | 100 % |
+|---|---|---|---|---|---|---|---|---|
+| In-plane 1× (mg) | 0.33 | 0.42 | 0.59 | 1.15–1.72 | 2.0 | 3.9 | 8.2 | 14.1 |
+| A-to-A spread (sd log10) | 0.051 | 0.050 | 0.015 | 0.097 | 0.025 | 0.035 | 0.021 | 0.010 |
+
+- A ×1.5 change would give z ≈ 12, 7 and 5 at 50, 70 and 80 %.
+- **60 % is speed-sensitive on this mount.** The board-x 1× fell from 1.52 to 1.00 mg as the speed rose from 1505 to 1523 rpm (1.2 %), so there is a steep response feature near 25 Hz. Expect weak z at 60 %. The combined effect down-weights it automatically.
+- **The fan's own 1× is mostly axial on `flat4`.** Board y is 1.7 mg at 50 % and 9 mg at 70 %: the corner of the frame rocks. Hence the axial and all-axis secondaries. An added blade mass adds a rocking moment as well as an in-plane force.
+- **Speed creeps up over the day:** about +1 % at fixed duty between 09:00 and 14:00. Each B is compared with its neighbouring A blocks, so this cancels.
+- **Fake B blocks:**
+  - A healthy block relabelled as B gives combined ×0.97, z −0.8, and |z| ≤ 1.5 on every secondary.
+  - A healthy block with an added tach-locked 1× sine (0.5 mg RMS per in-plane axis at 50 %, growing with ω²) gives ×1.56 at 50 %, ×1.21 at 70 % and combined ×1.38, z +8.7.
+  - The fake blocks were made with `fake_b.py`, a scratch script, not in the repo.
