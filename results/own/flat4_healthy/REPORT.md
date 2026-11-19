@@ -16,6 +16,7 @@ This note covers the feature evaluation at about 14:30 (18 sessions). For the me
 On `tapeCorner` the in-plane 1× was 2–4 mg at every speed (the standing fan rocked). Flat on the boxes, the fan's own imbalance barely moves the frame in its plane. Most of its 1× is axial (board y, 1.7 mg at 50 %, 9 mg at 70 %): the corner of the frame rocks.
 
 **Consequence for the synthetic-fault test.** Multiplying the in-plane 1× by 1.25–2 is caught much less often than on `tapeCorner`.
+The table below is from the first evaluation at 14:30 (one threshold session, before the review fixes); the corrected comparison is in the set L section.
 
 | Grid | Detector (O set, 8-window median) | False alarms | Detected at ×1.25 / ×1.5 / ×2 |
 |---|---|---|---|
@@ -24,7 +25,7 @@ On `tapeCorner` the in-plane 1× was 2–4 mg at every speed (the standing fan r
 | 10 % | Mahalanobis | 1.5 % | 1 / 2 / 45 % |
 | 5 % | AE | 5.8 % | 11 / 47 / 77 % |
 
-On `tapeCorner` the same test caught ×2 99.5 % of the time.
+On `tapeCorner` the same first test caught ×2 99.5 % of the time.
 
 Two reasons:
 - At 40–60 % a 0.62 s window measures background, not 1×.
