@@ -34,9 +34,9 @@ The to-do list lives in `Work/personal-assistant-bot/todos.md`.
 - `--source own` loads every session in `data/raw/`. Bring-up sessions would count as normal
   training data, and `--fan none` would count as an extra fan. Until the recorder is changed
   (pending, see "Discussed with Jonathan"), record bring-up with `--out data/bringup`.
-- Always pass `--mount`. `tapeCorner` is the standing setup used 18–19 Nov. From 19 Nov the fan lies
-  flat under a new mount id (see `docs/setup/bench_setup.md`). The default is `default`, which becomes
-  a separate client.
+- Always pass `--mount`. The current mount is **`flat4`** (fan lying flat on four corner screws, from
+  19 Nov). `tapeCorner` is the standing setup used 18–19 Nov. Photos and details are in
+  `docs/setup/bench_setup.md`. The default is `default`, which becomes a separate client.
 - Run the recorder from the repo root (profile paths and `--out data/bringup` are relative).
 
 ## Schedule check

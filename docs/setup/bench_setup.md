@@ -3,9 +3,25 @@
 | Mount id | Fan placement | Used | Status |
 |---|---|---|---|
 | `tapeCorner` | Standing on its edge, free on the floor; board taped on the frame's top edge | 18–19 Nov 2026 (bring-up, 7.4 h healthy overnight campaign) | Retired 19 Nov |
-| (new, e.g. `flat4`) | Lying flat on four corner supports, blowing up; board on a side wall | From 19 Nov 2026 | Being set up: photo and axes to be added |
+| `flat4` | Lying flat on four screws in the corner holes (about 5 mm off the floor); board taped on a side wall at the same corner | From 19 Nov 2026 | **Current**: axes to be confirmed by the first mount check |
 
-The rest of this page describes `tapeCorner` (standing).
+## `flat4` (current)
+
+| Side view | Top view |
+|---|---|
+| ![flat4, side](2026-11-19_flat4_side.jpg) | ![flat4, top](2026-11-19_flat4_top.jpg) |
+
+- **Fan:** the same `pc01`, lying flat with the hub label and struts facing **up**.
+  - It stands on four screws through its corner holes, so the frame sits about 5 mm above the wooden floor.
+  - On standard axial fans the strut side is the outlet, so it blows up and draws air in through the 5 mm gap underneath.
+- **Board:** taped vertically to the outer side wall at the same corner as before, header pins pointing outward. The jumper wires (PWM, tach, GND) run from the header to the breadboard, and the USB cable leaves along the floor.
+- **Board axes:** to be filled in from the first mount check (gravity gives the vertical axis, the magnetometer's 2× signal gives the rotor plane).
+- **Intake gap:** a 5 mm gap under a 120 mm fan is about 24 cm² of side opening (4 × 12 cm × 0.5 cm), roughly a fifth of the fan's inlet area. The fan therefore runs with a partly choked inlet.
+  - That is fine for detection, as long as it never changes between sessions.
+  - It does make the inlet-obstruction fault from the plan less meaningful.
+  - Raising the fan to about 3–5 cm would avoid this.
+
+## `tapeCorner` (retired 19 Nov)
 
 ![tapeCorner setup, fan standing on its edge](2026-11-19_tapeCorner_standing.jpg)
 
@@ -45,7 +61,7 @@ The rest of this page describes `tapeCorner` (standing).
   - Moving the fan on the floor.
   - Pressing on the frame.
 
-## Rules for a fault night on this setup
+## Rules for a fault night (any setup)
 
 - **Mark the fan's position on the floor** (tape at two corners) and the cable routing before the run.
 - When adding or removing mass, hold the frame still with one hand. Don't lift or slide the fan, and don't touch the board or its wires.
