@@ -107,7 +107,10 @@ python host/analysis/abtest.py --inplane xz --fig results/own/abtest/2026-11-19.
     ```
     Tested on fake blocks: the injected block was flagged in 27–73 % of windows at 50–80 % with L (much less with O); healthy and relabelled blocks were flagged in 0–6 %.
   - **Per-window threshold (changed 19 Nov, 19:35, before any fault data).** The main per-window result is the "max|z| LOSO" row, set L. It is fitted on all 31 healthy `flat4` sessions; the threshold is the 99.5th percentile of the pooled leave-one-session-out scores (`feature_eval.py --loso`).
-    - On the later `flat4` sessions this gave 1.3 % false alarms and caught every synthetic ×1.5 at 70–80 %.
+    - **Expected sensitivity is lower than the 19-session test suggested.** A model trained on the first 19 sessions, tested on the later 12, gave 1.3 % false alarms (5.2 % at 80 %) and caught ≥ 99.6 % of synthetic ×1.5 at 70–80 %.
+      - Tonight's model uses all 31 sessions, so its spread includes an afternoon drift of the healthy in-plane 1× (board z ×0.7 at 70–80 %).
+      - Its own leave-one-session-out estimate catches ×1.5 in about 34 / 68 % of windows at 70 / 80 %, and ×2 in 100 %.
+      - So per window, a ×1.5-sized change is marginal. The A-B-A block comparison (`abtest.py`) stays primary.
     - On pre-night healthy `ab_block` block 1 it flagged 0 % of windows at every duty. The rotated Mahalanobis and AE thresholds flagged 19–41 % at 50 % on the same block.
     - The rotated rows stay in the output for comparison only.
   - accel 2× and 0.5×.

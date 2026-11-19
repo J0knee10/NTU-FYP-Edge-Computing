@@ -28,7 +28,7 @@ import feature_eval as fe  # noqa: E402
 
 DUTIES = (300, 400, 500, 600, 700, 800)
 SETS = ("O  11 order features (accel+gyro, per axis)", "L  11 features, 5 s tach-locked orders")
-LOSO_Q = 0.995  # percentile of pooled out-of-session scores (feature_eval --loso: 1.3 % false alarms on flat4)
+LOSO_Q = 0.995  # percentile of pooled out-of-session scores (feature_eval --loso, 19-session model: 1.3 % FA on flat4)
 
 
 def load_dir(d, campaign_only):

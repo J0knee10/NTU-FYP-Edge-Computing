@@ -100,10 +100,14 @@ The evidence is from two healthy campaigns, `tapeCorner` and `flat4` (reports in
   - Result, at matched 2 % false alarms and equal data span (about 10 s): ×1.5 in-plane is caught 90–92 % of the time at 70–80 % with 5 s windows, against 56–68 % with 0.62 s windows (best detector for each, after a methods review).
   - **On `tapeCorner` too**, where the 1× is large at every speed: at matched 2 % false alarms, ×1.5 is caught 85 % of the time with 5 s windows against 29 % with 0.62 s windows. So the gain is not specific to the quiet mount.
   - **Thresholds from one held-out healthy session give unstable false alarms** (1–9 %, up to 24 % for streaming).
-  - **A pooled calibration fixes this** (`feature_eval.py --loso`, 31 `flat4` sessions; later sessions as the test). Each healthy calibration session is scored by a model fitted on the others, and the threshold is the 99.5th percentile of those pooled scores. With 5 s windows and max|z|: 1.3 % false alarms, at most about 5 % in any test session, and ×1.5 at 70–80 % caught 100 % of the time.
-  - **A speed gate is needed:** skip a window whose tach speed is more than 3 % off the current step's median.
+  - **A pooled calibration helps** (`feature_eval.py --loso`, 31 `flat4` sessions). Each healthy calibration session is scored by a model fitted on the others, and the threshold is a high percentile of those pooled scores.
+    - **On one forward split** (train 19, test the later 12), 5 s windows and max|z| give 0.6–2.4 % false alarms across the 99–99.9th percentiles (5.2 % at 80 % for the 99.5th). ×1.5 at 70 % is caught 84–100 % of the time.
+    - **The percentile was picked after seeing these results.**
+    - **It does not hold for every split.** With a test block in the middle of the day, ×1.5 is caught 0–13 % of the time. The healthy in-plane 1× drifted in the afternoon (board z ×0.7 at 70–80 %), about the size of the fault, and that drift widens the spread.
+    - Leave-one-session-out scores also underestimate future false alarms.
+  - **A speed gate is needed:** skip a window whose tach speed is more than 3 % off the current step's median. On the device, use past data only as the reference, and count gated windows: a speed that keeps leaving the band is itself a symptom, for example a rubbing fan slowing down.
     - On `tapeCorner` (logger 0.3.1), short tach glitches put the narrowband features on the wrong bin, with z up to about 150, and wrecked the calibration.
-    - With the gate: 4.6 % false alarms and ×1.5 caught 99.5 % of the time.
+    - With the gate: 4.6 % false alarms and ×1.5 caught 99.5 % of the time. The 3 % was chosen on these results, and at 2 % or 5 % only 54–69 % is caught.
   - **Prefer max|z| over Mahalanobis or the autoencoder.** Those two react to slow drift through the day; with one threshold session their false alarms rose to about 15–27 % in most late-afternoon sessions.
 - **Speed-conditioned normalisation works.** Each feature's healthy median and spread is learned per duty and interpolated in log rpm, with the spread = within- and between-session spread combined. On the board this is one small table per feature.
 - **Some speeds stay hard.** At 30–40 % there is no 1× above the background even at 10 s, because imbalance force scales with ω². An unseen speed between grid points still raises false alarms. Both are jobs for the RL agent: speed as context, ADAPT at a new speed.
@@ -120,7 +124,7 @@ The evidence is from two healthy campaigns, `tapeCorner` and `flat4` (reports in
 | 7 | accel 150–400 Hz band RMS | 512 |
 | 8–10 | gyro 1× RMS, x, y, z | 4096 |
 
-All are log10, normalised by the speed table, then scored by max|z| (preferred; a small autoencoder is the alternative), after a running median over about 9 s. The speed comes from the tach (logger ≥ 0.3.2). A window is skipped if its speed is more than 3 % off the step's median. The threshold is calibrated on pooled out-of-session scores from several healthy sessions (99.5th percentile).
+All are log10, normalised by the speed table, then scored by max|z| (preferred; a small autoencoder is the alternative), after a running median over about 9 s. The speed comes from the tach (logger ≥ 0.3.2). A window is skipped if its speed is more than 3 % off the step's median. The threshold is calibrated on pooled out-of-session scores from several healthy sessions (99.5th percentile, to confirm on the fault data). Slow drift of the healthy 1× is expected and needs the agent's ADAPT.
 
 **Board cost (estimate, to measure in step 5):**
 - **FFT approach:**
@@ -132,7 +136,7 @@ All are log10, normalised by the speed table, then scored by max|z| (preferred; 
 
 **Still to do:**
 - Re-run on the real fault blocks (`fault_eval.py`).
-- Choose FFT-with-overlap or streaming. Streaming is cheaper and about as good on the synthetic test. With the pooled calibration it gives 1.1 % false alarms, catching ×1.5 79 / 97 % of the time at 70 / 80 % (8-window FFT version: 100 / 100 %).
+- Choose FFT-with-overlap or streaming. Streaming is cheaper and about as good on the synthetic test. With the pooled calibration, on the same forward split, it gives 1.1 % false alarms, catching ×1.5 79 / 97 % of the time at 70 / 80 % (8-window FFT version: 99.6 / 99.9 %).
 - Check the 60 % step after the anti-alias firmware (0.4.0).
 - Port into `host/features/` (`spec.py`, `extract.py`) once decided.
 
