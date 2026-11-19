@@ -72,6 +72,11 @@ The synthetic test also overstates the problem at low speed. Multiplying a backg
 - **At 70–80 % the 5 s windows are what make detection work.** A ×1.5 change is caught 90–99 % of the time, against 20–30 % with 0.62 s windows, at a similar false-alarm rate. L is also much less sensitive to which session sets the threshold.
 - **At 40–60 % neither set catches a ×1.5 change** in the fan's own 1×, which is near the background there. A real added mass adds its own 1× force, so tonight's blocks will show whether it rises above the background at these speeds.
 - **No single window is enough.** Without the running median, L catches ×1.5 at 70–80 % only 59–64 % of the time: one 5 s window is not enough, and the median over 8 overlapping windows (about 9 s) is needed.
+- **The gain is not just more data.**
+  - L's 8-window median spans about 9.4 s (overlapping 5 s windows); O's spans 5 s.
+  - At equal span, O with a 16-window median (about 10 s; `feature_eval_grid10L_rot_avg16.json`, `--max-sessions 18` for the same split) catches ×1.5 at 70 / 80 % 50 / 45 % of the time at 3.4 % false alarms. L gets 99 / 90 % at 2.1 %.
+  - At equal 5 s, L with no median gets 59 / 64 % and O with an 8-window median 19 / 21 %.
+  - The narrow tach-locked band, with its lower background, is what helps.
 - **A spread floor of 0.03 log10** (`feature_eval_grid10L_rot_f03.json`) lowers false alarms to about 1 %, but drops L's ×1.5 detection at 70–80 % to 14 %: the floor is larger than the 1× spread there. Don't use a uniform floor. If a floor is needed, set it per feature (for example only for 12× and the 150–400 Hz band).
 - **Oall (vector orders) stays blind** (≤ 7 % at ×2), as on `tapeCorner`. Features must be per axis.
 - **The streaming variant also works** (`feature_eval_grid10L_rot_sub8.json`, `--subsample 8 --avg 3`): non-overlapping 5 s windows, as a running single-bin DFT on the board would give, with a median of 3 (15 s). L catches ×1.5 at 70 / 80 % 81 / 84 % of the time with max|z|, 94 / 93 % with Mahalanobis and 80 / 87 % with the AE, at 1.9–2.7 % false alarms. That is close to the overlapping version, with no sample buffer and slower decisions.

@@ -58,6 +58,11 @@ def load():
             if side.exists():
                 z.update(dict(np.load(side)))
             tabs.append(z)
+    with_long = [t for t in tabs if "acc_axis_long" in t]
+    if with_long and len(with_long) < len(tabs):  # compare all sets on the same sessions
+        print(f"WARNING: {len(tabs) - len(with_long)} session(s) have no long-window sidecar (run long_windows.py);"
+              " left out:", [t["name"] for t in tabs if "acc_axis_long" not in t])
+        tabs = with_long
     return tabs
 
 
@@ -283,6 +288,7 @@ def main():
     ap.add_argument("--spread-floor", type=float, default=1e-3, help="minimum spread per feature, log10 units")
     ap.add_argument("--rotate", action="store_true", help="each sweep-type training session as threshold session in turn")
     ap.add_argument("--subsample", type=int, default=1, help="keep every k-th window row (emulates a longer hop)")
+    ap.add_argument("--max-sessions", type=int, help="use only the first N sessions (reproduce an earlier split)")
     args = ap.parse_args()
     global SPREAD_FLOOR, SUBSAMPLE
     SPREAD_FLOOR = args.spread_floor
@@ -292,6 +298,8 @@ def main():
     lo, hi = (int(v) for v in args.lodo.split(":"))
     lodo_duties = [d for d in duties if lo <= d <= hi]
     tabs = load()
+    if args.max_sessions:
+        tabs = tabs[:args.max_sessions]
     n = len(tabs)
     ntr = max(3, int(round(args.train_frac * n)))
     # Threshold session: the last sweep-type session (all duties) in the training block, held out.
