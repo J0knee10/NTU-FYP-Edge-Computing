@@ -1,5 +1,6 @@
 """Did the mount move over the night? Gravity direction per session (and within the last sessions),
 rpm per duty per session, and 1x amplitude per axis over time at fixed duty."""
+import os
 import glob
 import json
 from datetime import datetime
@@ -11,7 +12,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-OUT = Path("results/own/overnight")
+OUT = Path(os.environ.get("ANALYSIS_OUT", "results/own/overnight"))  # ANALYSIS_OUT: one results folder per campaign
 RAW = Path("data/raw")
 names = []
 for f in sorted(glob.glob(str(OUT / "windows" / "*.npz"))):

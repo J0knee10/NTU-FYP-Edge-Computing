@@ -2,6 +2,7 @@
 
 usage: python windows.py <session_dir> [...]   -> results/own/overnight/windows/<session>.npz
 """
+import os
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -15,7 +16,7 @@ from features.extract import window_features  # noqa: E402
 from features.spec import DEFAULT_SPEC  # noqa: E402
 
 REPO = Path(__file__).resolve()
-OUT = Path("results/own/overnight/windows")
+OUT = Path(os.environ.get("ANALYSIS_OUT", "results/own/overnight")) / "windows"  # ANALYSIS_OUT: one results folder per campaign
 W = DEFAULT_SPEC.window  # 512 IMU samples, ~0.61 s
 ORDERS = np.arange(1, 13)
 

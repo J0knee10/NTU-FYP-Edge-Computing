@@ -1,4 +1,5 @@
 """Clean figures for the overnight report (results/own/overnight/figs/report_*.png)."""
+import os
 import glob
 import json
 import sys
@@ -15,7 +16,7 @@ from matplotlib.colors import LinearSegmentedColormap
 sys.path.insert(0, str(Path(__file__).parent))
 from explore import Session, psd  # noqa: E402
 
-OUT = Path("results/own/overnight")
+OUT = Path(os.environ.get("ANALYSIS_OUT", "results/own/overnight"))  # ANALYSIS_OUT: one results folder per campaign
 FIG = OUT / "figs"
 INK, INK2, GRID = "#0b0b0b", "#52514e", "#e4e3df"
 S1, S2, S3 = "#2a78d6", "#eb6834", "#1baf7a"  # categorical slots 1-3

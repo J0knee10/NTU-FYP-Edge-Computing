@@ -6,6 +6,7 @@
 
 usage: python repeatability.py   (reads results/own/overnight/windows, writes figs + repeatability.json)
 """
+import os
 import glob
 import json
 from datetime import datetime
@@ -17,7 +18,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-OUT = Path("results/own/overnight")
+OUT = Path(os.environ.get("ANALYSIS_OUT", "results/own/overnight"))  # ANALYSIS_OUT: one results folder per campaign
 FIG = OUT / "figs"
 L = lambda v: np.log10(np.maximum(v, 1e-9))  # noqa: E731
 

@@ -2,6 +2,7 @@
 
 usage: python night_summary.py [--blades N]
 """
+import os
 import glob
 import json
 import sys
@@ -17,7 +18,7 @@ import numpy as np
 from features.normalise import Normaliser
 from models.autoencoder import MLPAutoencoder
 
-OUT = Path("results/own/overnight")
+OUT = Path(os.environ.get("ANALYSIS_OUT", "results/own/overnight"))  # ANALYSIS_OUT: one results folder per campaign
 FIG = OUT / "figs"
 FIG.mkdir(parents=True, exist_ok=True)
 BLADES = int(sys.argv[sys.argv.index("--blades") + 1]) if "--blades" in sys.argv else 7
