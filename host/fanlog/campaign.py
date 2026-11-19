@@ -3,7 +3,7 @@
     python -m fanlog.campaign --fan pc01 --mount tapeCorner --fault normal --until 07:30
 
 Plan: a mount_check at the start and at the end (to see whether the mounting drifted),
-and in between a repeating cycle of speed_sweep, constant_10min, benign_drift and a
+and in between a repeating cycle of speed_sweep, speed_sweep_fine (5 % steps), constant_10min, benign_drift and a
 30 min steady run at a different duty each cycle. Every session records audio.
 
 Stops starting new sessions after --until (local time) or when <out>/STOP exists.
@@ -38,6 +38,8 @@ def plan(cycle: int) -> list[tuple[str, list[str]]]:
     duty = STEADY_DUTIES[cycle % len(STEADY_DUTIES)]
     return [
         ("speed_sweep", ["--profile", str(PROFILES / "speed_sweep.json")]),
+        # 5 % steps: the healthy curve of each feature vs speed needs finer sampling than 10 %.
+        ("speed_sweep_fine", ["--profile", str(PROFILES / "speed_sweep_fine.json")]),
         ("constant_10min", ["--profile", str(PROFILES / "constant_10min.json")]),
         ("benign_drift", ["--profile", str(PROFILES / "benign_drift.json")]),
         (f"steady{duty // 10}", ["--pwm", str(duty), "--duration", "1800"]),

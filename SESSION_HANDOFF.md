@@ -123,7 +123,27 @@ The to-do list lives in `Work/personal-assistant-bot/todos.md`.
 - Overnight campaign 00:07–07:49: 22 sessions, 7.4 h, every sensor, no data loss. Placement is fine
   for the fault test (caveats: slow 1× drift, 0.5× rocking at 90–100 %). Full findings:
   [`results/own/overnight/REPORT.md`](results/own/overnight/REPORT.md).
-- Python tests: `pytest host -q` → **34 passed**.
+- Python tests: `pytest host -q` → **35 passed**.
+
+## 19 Nov (day): flat4 mount, reviews, logger 0.3.2
+
+- **Mount moved to `flat4`.** The fan lies flat across two boxes; the mount check passed (`docs/setup/bench_setup.md`). A healthy campaign is running on it until 19:00 (`data/raw/campaign_20261119-093838.log`, analysis in `results/own/flat4_healthy`).
+- **Two independent reviews** (subagents) checked the code and the analysis. They found:
+  - **Tach lock bug (0.3.1).** The glitch filter could lock at 1/2 or 1/3 of the real speed after one lost edge or a fast spin-up. Fixed in **logger 0.3.2**: simulated, and checked on the fan (tach vs audio within 0.15 %, smooth 30↔100 % steps).
+  - **Wrong rpm in the steps 1–4 loader.** `session_recording` mapped rpm using STATUS rows from before START. Fixed, with a test.
+  - **Analysis fixes:**
+    - tach-only speed for 0.3.1+ data (the audio-refined speed was circular for audio features);
+    - order amplitudes in true RMS;
+    - per-axis features.
+  - **Overnight report claims were too strong.** Order features were ranked on false alarms only; the unseen-speed test was thin; thresholds were set on random neighbouring windows. `host/analysis/feature_eval.py` redoes this properly: speed-conditioned normalisation, session-held-out thresholds, leave-one-duty-out, synthetic faults.
+- **Stricter feature evaluation** (`feature_eval.py` on the overnight data; table in REPORT section 7):
+  - Features must be **per axis**.
+  - Average about **5 s** (8 windows) before scoring.
+  - A simple **max |z|** on speed-normalised per-axis order features detects a doubled in-plane 1× 99.5 % of the time at 1.3 % false alarms. That matches the autoencoder, with fewer false alarms.
+  - **Unseen speeds are not solved** at 10 % duty spacing: amplitude vs speed is uneven. The campaign now adds a 5 % sweep, and learning a new speed is a candidate RL role (ADAPT at a new speed).
+  - Repeat this on `flat4` and on the real Blu-Tack data.
+- **Imbalance night plan:** `docs/experiments/2026-11-19_imbalance_ABA.md` (A-B-A with sham and hub-mass controls; `ab_block` profile; analysis `host/analysis/abtest.py`, fixed in advance).
+- **Next firmware change (after tonight):** stop the IMU aliasing of the motor's 24×/36×/48× orders (IMU at 1.66 kHz plus on-board decimation, or the 200 Hz filter). Then re-record the main dataset.
 
 ## Rules
 

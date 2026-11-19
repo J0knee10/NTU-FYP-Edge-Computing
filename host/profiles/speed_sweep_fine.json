@@ -1,0 +1,22 @@
+{
+  "name": "speed_sweep_fine",
+  "description": "Healthy-reference sweep in 5 % steps (1 min each), so the healthy curve of every feature vs speed is sampled finely enough to interpolate. Amplitudes vary unevenly with speed (mount resonances), and 10 % steps were too coarse (feature_eval, 19 Nov).",
+  "steps": [
+    {"pwm": 1000, "seconds": 60, "label": "warmup"},
+    {"pwm": 300, "seconds": 60, "label": "duty30"},
+    {"pwm": 350, "seconds": 60, "label": "duty35"},
+    {"pwm": 400, "seconds": 60, "label": "duty40"},
+    {"pwm": 450, "seconds": 60, "label": "duty45"},
+    {"pwm": 500, "seconds": 60, "label": "duty50"},
+    {"pwm": 550, "seconds": 60, "label": "duty55"},
+    {"pwm": 600, "seconds": 60, "label": "duty60"},
+    {"pwm": 650, "seconds": 60, "label": "duty65"},
+    {"pwm": 700, "seconds": 60, "label": "duty70"},
+    {"pwm": 750, "seconds": 60, "label": "duty75"},
+    {"pwm": 800, "seconds": 60, "label": "duty80"},
+    {"pwm": 850, "seconds": 60, "label": "duty85"},
+    {"pwm": 900, "seconds": 60, "label": "duty90"},
+    {"pwm": 950, "seconds": 60, "label": "duty95"},
+    {"pwm": 1000, "seconds": 60, "label": "duty100"}
+  ]
+}

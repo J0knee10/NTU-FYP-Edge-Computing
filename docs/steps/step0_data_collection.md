@@ -198,8 +198,9 @@ FL client.
 - `rpm` changes when the PWM step changes, and is steady within a step.
 - `imu` stays around 825–835 Hz (nominal 833 Hz; the IMU's own clock and the board's RC time base both
   differ from nominal by under 1 %).
-- `rpm` matches the fan's sound: logger 0.3.1 times tach edges on a 1 MHz crystal timer and filters PWM
-  glitches. 0.3.0 counted 1–1.6 % extra pulses under PWM (see `results/own/overnight/REPORT.md`).
+- `rpm` matches the fan's sound. Logger 0.3.2 times tach edges on a 1 MHz crystal timer and filters PWM
+  glitches without locking onto a fraction of the speed. 0.3.0 counted 1–1.6 % extra pulses under PWM;
+  0.3.1 could lock at 1/2 or 1/3 of the speed after a lost edge. Use 0.3.2 or later.
 - `overruns`, `audio_drop`, `crc_err` and `lost` stay at 0, and the summary has no `WARNING` lines.
 
 ### What ends up in the session folder

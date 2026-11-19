@@ -41,7 +41,7 @@
   - the microphone now facing sideways.
 
   This doesn't matter as long as nothing moves.
-- **Where the Blu-Tack should show:** in-plane 1× (x, z) at 30–70 %, where the healthy baseline is about 1 mg.
+- **Where the Blu-Tack should show:** in-plane 1× (x, z) at 50–80 %. There the healthy baseline is only about 0.5–4 mg, and the imbalance force (∝ speed²) is already large. At 30 % the force is 6× smaller and the baseline (about 0.3 mg) is close to the sensor noise.
 
 ### Trial: flat on screws, 5 mm off the floor (not recorded)
 

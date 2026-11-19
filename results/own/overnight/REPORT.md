@@ -14,12 +14,15 @@ The fan was healthy: a Thermalright TL-H12-X28-R7, 120 mm, standing free on its 
 - **Placement verdict.** The tape mount worked: the fan shows clearly on every motion sensor (1× is about 40 dB above the noise floor) and nothing came loose. The caveats are below: a slow drift over the night and rocking at full speed, both from the fan standing free on its edge.
   - **Update 19 Nov morning:** the fan was moved to lie flat (mount `flat4`, see [`docs/setup/bench_setup.md`](../../../docs/setup/bench_setup.md)), which removed the rocking.
   - The "mount resonances" in the first version of this report turned out to be aliased motor orders (see section 3).
-- **The main feature finding.** Per-rotation (order) amplitudes, computed against an accurate fan speed, are very stable and generalise to speeds the model never saw:
-  - The current 48 fixed-frequency features raise **93 %** false alarms at unseen speeds.
-  - Order features raise **0.26 %**.
-
-  This is strong evidence for switching step 1 to order-normalised features.
-- **Bug found and fixed.** The tach speed was wrong by +1–1.6 % and noisy, because `micros()` on this core only ticks every 976 µs. Fixed in **logger 0.3.1**, which is already on the board and verified against the audio blade-pass frequency to within 0.15 %. Last night's data was re-analysed with a speed reference derived from the audio.
+- **The main feature finding, with a caveat** (corrected after review, see section 7):
+  - **What holds:** fixed-frequency features fail at fan speeds the model never saw (**93 %** false alarms), and order (per-rotation) features don't (**0.5 %**).
+  - **What was overstated:** that ranking used false alarms only. In a synthetic-fault test by an independent reviewer, the same order-feature autoencoder barely reacted to a ×2–3 increase in 1×.
+  - **Why:** each feature was normalised by its spread over *all* speeds, and the unseen-speed test is small.
+  - So "order features are the right set" was not shown. `host/analysis/feature_eval.py` redoes the comparison properly. With per-axis order features, normalised to the healthy value at the current speed and averaged over about 5 s, a doubled in-plane 1× is detected 99.5 % of the time at 1.3 % false alarms. Unseen speeds remain an open problem (section 7).
+- **Bugs found and fixed.**
+  - The tach speed was wrong by +1–1.6 % and noisy, because `micros()` on this core only ticks every 976 µs. Fixed in logger 0.3.1.
+  - A review then found that 0.3.1's glitch filter could lock onto 1/2 or 1/3 of the speed after a lost edge. Fixed in **logger 0.3.2**, now on the board; tach vs audio blade-pass agree within 0.15 %.
+  - Last night's (0.3.0) data was re-analysed with a speed taken from the audio blade-pass peak.
 - **Fan facts learned from the data:**
   - 7 blades: the audio blade-pass peak is at 7×.
   - 4-pole motor: the magnetometer peak is at 2× (electrical frequency).
@@ -67,7 +70,21 @@ The fix in 0.3.1 has three parts:
 | Speed noise per STATUS (250 ms) | 23–55 rpm | 1–9 rpm |
 | Glitch edges rejected | — | 110 in 3 min |
 
-For last night's data, `host/analysis/windows.py` uses the tach pulses over ±2 s, refined per window by the audio blade-pass peak. That brought the blade-pass noise from 0.49 to 0.11 and accel 8× from 0.45 to 0.05.
+**Logger 0.3.2 (19 Nov, after review).** The 0.3.1 filter could lock onto 1/2 or 1/3 of the real speed after a single lost edge or a fast spin-up, because the "¾ of the last period" rule then kept rejecting every other real edge.
+
+0.3.2 fixes this in two ways:
+- It trusts a period only when two consecutive periods agree within 25 %.
+- It switches the rule off after three accepted edges in a row that each followed a rejection.
+
+It passes simulated lost edges, glitches, spin-up from rest and 0.05–1 s speed steps. On the fan it matches the audio within 0.15 % and tracks 30↔100 % jumps smoothly.
+
+**Speed reference used in the analysis.**
+- **Last night's 0.3.0 data:** `host/analysis/windows.py` uses the tach pulses over ±2 s, refined per window by the audio blade-pass peak. That brought the blade-pass noise from 0.49 to 0.11 and accel 8× from 0.45 to 0.05.
+  - That refinement is circular for audio features, since it centres the 7× band on the peak that defines the speed. The audio-feature stability figures for this night are therefore optimistic.
+  - The audio-derived speed also doesn't exist on the board.
+- **0.3.1+ data:** the tach speed alone is used, and the audio speed is kept only as a cross-check. They agree to 1.0000 (median ratio).
+
+Since 19 Nov, all order amplitudes are true RMS (Hann-window factor 2.31; earlier tables were 0.43 × RMS).
 
 The board's own time base (STATUS `t_us`) runs on the RC oscillator and is 0.23 % fast relative to the crystal; audio comes out at exactly 16 000 Hz on crystal time. Features are unaffected because every stream uses the same board time, and the analysis corrects the tach clock to it.
 
@@ -99,28 +116,29 @@ Peaks that line up across speeds when plotted against rotation order belong to t
 
 ![Features vs speed](figs/report_features_vs_speed.png)
 
-- **Accel 1×** is roughly flat from 30 to 90 % (−40 to −36 dB re 1 g, about 10–16 mg), then drops about 10 dB at 100 %, where the 0.5× rocking takes over.
-  - Imbalance force grows with speed² (F = m·r·ω²). An added mass should therefore show most at **80–90 %** and change the *shape* of 1× vs speed, not only its level.
+- **Accel 1×** is roughly flat from 30 to 90 % (−33 to −29 dB re 1 g, about 23–37 mg RMS, nearly all fore-aft rocking), then drops about 10 dB at 100 %, where the 0.5× rocking takes over.
+  - Imbalance force grows with speed² (F = m·r·ω²). An added mass should therefore show most at higher speeds and change the *shape* of 1× vs speed, not only its level.
 - **Gyro 1×** is lowest at 50 % and rises steeply above 80 %.
 - **Audio blade-pass** rises about 20 dB from 30 to 100 %.
 - **Accel 2× and 150–400 Hz energy** jump at 90–100 %, along with the 0.5× rocking.
 
 ## 5. Noise, repeatability and drift
 
-| Feature | Typical spread within a hold (robust) | Spread between sessions | Smallest increase detectable from a 30 s average (3σ) |
-|---|---|---|---|
-| Accel 1× | ±1–3 % | 3.5 % (2–4 % at 50–90 %) | **15 %** |
-| Gyro 1× | ±3–4 % | 3.8 % | **15 %** |
-| Magnetometer 2× | ±29 % per window | 1.9 % | 13 % |
-| Audio 7× (blade pass) | ±33 % per window | 5 % | 20 % |
-| Accel rms (all) | ±1 % | 5 % | 15 % |
-| Accel 150–400 Hz | ±3 % | 8 % | 25 % |
+Smallest increase detectable from a 30 s average (3σ). The spread includes all of the night's drift between sessions, so each value is "compared with a baseline from any time last night", per duty:
 
-How to read the table:
+| Feature | 30 % | 40 % | 50 % | 60 % | 70 % | 80 % | 90 % | 100 % |
+|---|---|---|---|---|---|---|---|---|
+| Accel 1× | 40 % | 24 % | 12 % | 10 % | **5.5 %** | **5.6 %** | 19 % | 107 % |
+| Gyro 1× | 40 % | 23 % | 11 % | 12 % | **5.2 %** | **2.5 %** | 18 % | 20 % |
+| Audio 7× (blade pass) | 33 % | 23 % | 24 % | 30 % | 18 % | 14 % | 15 % | 50 % |
+| Magnetometer 2× | 4.3 % | 6.9 % | 9.9 % | 11 % | 15 % | 17 % | 23 % | 18 % |
 
-- The between-session spread includes all of the night's drift, so the last column is the conservative "compared with a baseline from any time last night".
-- Against a baseline recorded **right before** a fault, accel and gyro 1× can resolve changes of a few percent.
-- A few outlier windows (bumps, transients) widen the plain sd, so detection should use the **median of several windows**, not single windows.
+How to read the table (corrected after review):
+
+- These are single-feature figures measured on the old `tapeCorner` mount. The autoencoder does not reach them (section 7), and `flat4` needs its own numbers.
+- Within a 30-min hold, 30 s medians of accel 1× vary by under 1 % at 30–80 %. But the 90 % hold drifted −16.5 % in 30 min (the reviewer's check).
+- What handling the fan does is not measured yet; tonight's sham block measures it.
+- Single windows have outliers (bumps, transients). Detection should use the **median of several windows** (about 5 s), not single windows.
 
 ![Baseline per sweep](figs/report_baseline_per_sweep.png)
 
@@ -152,14 +170,57 @@ Most likely the fan, standing free on the floor, is settling, and/or the tape ad
 ![Feature sets](figs/report_feature_sets.png)
 
   - Fixed-Hz features fail completely at a speed they haven't seen (93–100 % false alarms): every peak lands in a different band. Adding rpm as an input doesn't help.
-  - **Order amplitudes plus log rpm generalise: 0.26 % at unseen speeds.** That uses 35 features from accel, gyro, magnetometer and audio.
-  - Without audio: 2.4 %. Accel orders only: 7 %.
-  - Caveat: the unseen test is only two speeds (55 % and 65 %), all from the same night and mount.
-- **Implication for step 1.** Use order-normalised features (amplitudes at k × running speed, from accel and gyro, plus audio if the edge budget allows), with the 0.3.1 tach as the speed reference. Track the healthy baseline as a function of speed rather than per speed band.
+  - Order amplitudes plus log rpm (35 features from accel, gyro, magnetometer and audio) give **0.5 %** at unseen speeds (0.26 % in the first version; it moves with the random seed). Without audio: 1.7 %. Accel orders only: 4 %.
 
-## 8. Placement verdict
+**Corrections after an independent review (19 Nov).** The comparison above is weaker than first written:
 
-**Keep the current tape placement for the fault test.** It passes everything that matters:
+1. **It measures false alarms only.** The reviewer injected synthetic faults into the test windows (accel 1× multiplied):
+   - The order-feature autoencoder (set C) went from 0.75 % to only 1.6 % alarms at **×3**.
+   - A plain per-duty z-score of accel 1× flagged even +10 % in most single windows.
+   - Cause: each feature was normalised by its spread over *all* speeds (accel 1× × 2 is only 1.6 of those units), and the score averages 35 features.
+2. **The unseen-speed test is small** (780 windows, ten 48 s segments, two speeds between trained duties) and depends on the random seed. Accel-orders-only ranged 1.9–15 % across seeds.
+3. **Thresholds were set on random windows from the same sessions as training**, pooled over all duties. Neighbouring windows are correlated, so "1 % expected" is not a valid reference.
+
+`host/analysis/feature_eval.py` redoes the comparison with:
+- speed-conditioned normalisation (each feature's healthy curve and spread vs rpm);
+- thresholds from a held-out session;
+- a leave-one-duty-out test;
+- detection rates for synthetic faults;
+- three detectors: max |z|, Mahalanobis and the autoencoder.
+
+**Results of the stricter evaluation** (this night's `tapeCorner` data, duties 30–80 %):
+- training on the first 11 sessions;
+- the alert threshold from the held-out 03:14 sweep;
+- tests on the last 9 sessions;
+- the synthetic fault: in-plane accel 1× (board x and z) × f at 40–80 %;
+- features averaged as a running median of 8 windows (about 5 s).
+
+| Feature set | Detector | False alarms, later sessions | Detected at ×1.25 / ×1.5 / ×2 | False alarms at a duty left out of training |
+|---|---|---|---|---|
+| 48 fixed-Hz bands (current spec) | autoencoder | 8.5 % | (not injectable) | 100 % at every duty |
+| All orders, axes summed (acc 1–9×, gyro 1–6×, mag 1–3×) | max \|z\| | 1.0 % | 1 / 1 / 1 % | 4–100 % |
+| 11 per-axis order features (accel 1× x/y/z, 2×, 0.5×, 7×, 12×, 150–400 Hz, gyro 1× x/y/z) | max \|z\| | **1.3 %** | 7 / 18 / **99.5 %** | 3–100 % |
+| same 11 | autoencoder (3 seeds) | 6.9 ± 2.4 % | 12 / 41 / 99 % | 10–100 % |
+| same 11, single windows, no averaging | max \|z\| | 0.5 % | 0.5 / 0.5 / 0.5 % | — |
+
+What this shows (all on the old rocking mount, with a synthetic fault; to be repeated on `flat4` and on tonight's real masses):
+1. **Features must be per axis.** Summed over axes, a doubled in-plane 1× is invisible behind the large fore-aft rocking.
+2. **Average about 5 s before scoring.** On single windows, outlier windows set the threshold, and nothing is detected.
+3. **A max-|z| detector on speed-normalised per-axis features matches the autoencoder's detection, with fewer false alarms.** The autoencoder must earn its place on faults that change several features together.
+4. **Unseen speeds are not solved by order features alone.** With a whole duty left out (gaps of 10 % on either side), interpolating the healthy curve fails at several duties: amplitude vs speed is uneven because of mount resonances.
+   - Healthy references now include a 5 % sweep (`speed_sweep_fine`, added to the campaign cycle on 19 Nov).
+   - Learning a new speed is a natural decision for the RL agent: ADAPT at a new speed, ALERT on a change at a known speed.
+5. **The earlier "0.26 % at unseen speeds" (set C) mostly reflected insensitivity, not generalisation.**
+
+- **Implication for step 1:**
+  - Use order-normalised features from accel and gyro, per axis, with the logger 0.3.2 tach as the speed reference.
+  - Normalise each feature against its healthy value *at the current speed*.
+  - Average over about 5 s before scoring.
+  - Choose the set by detection rate at a fixed false-alarm rate, not by false alarms alone.
+
+## 8. Placement verdict (`tapeCorner`, retired 19 Nov)
+
+The fan was moved to the flat `flat4` mount on the morning of 19 Nov, which removed the rocking described below (see `docs/setup/bench_setup.md`). At the time the verdict was to keep the tape placement for the fault test. It passed everything that matters:
 
 - Strong 1× on accel and gyro.
 - Repeatable baselines (2–4 % at 50–90 %).
@@ -189,7 +250,14 @@ A future improvement (not before tonight, and under a new `--mount` id): fix the
 
 ## 9. Plan for tonight (Blu-Tack imbalance)
 
-Update 19 Nov: the fan now lies flat (`flat4`). The plan is unchanged, but the healthy reference must be recorded on `flat4`. On `flat4` the in-plane 1× (x, z) baseline is about 1 mg at 30–70 %, so that is where the mass should show best.
+**Superseded on 19 Nov by [`docs/experiments/2026-11-19_imbalance_ABA.md`](../../../docs/experiments/2026-11-19_imbalance_ABA.md).** It is on `flat4` with logger 0.3.2 and has:
+- a healthy block between every mass;
+- a sham-touch block and a hub-mass control;
+- masses of 0.05–0.2 g at 25 mm, in mixed order, on blade 1 and on blade 4;
+- the `ab_block` profile at 40–80 %, with no 100 %;
+- the analysis fixed in advance (`host/analysis/abtest.py`, primary measure in-plane accel 1×).
+
+The original plan below is kept for the record. Its commands began with a 100 % warm-up, contradicting its own "start each mass at 30–50 %".
 
 1. **Don't touch the fan or the board before the run.** Logger 0.3.1 is already flashed.
    - Mark the fan's position on the floor (tape at two corners) and leave the cables as they are.
@@ -233,8 +301,17 @@ python host/analysis/night_summary.py --blades 7         # summary.json + figs/
 python host/analysis/repeatability.py                    # repeatability.json + figs/baseline_repeatability.png
 python host/analysis/mount_drift.py                      # mount_drift.json + figs/mount_drift.png
 python host/analysis/report_figs.py                      # figs/report_*.png
-python host/analysis/autoproc.py <campaign log>          # runs windows/summary automatically during a campaign
+python host/analysis/autoproc.py <campaign log>          # runs windows/summary/session checks automatically during a campaign
+python host/analysis/feature_eval.py --seeds 3 --avg 8   # feature sets x detectors, session split, synthetic faults
 ```
+
+Set `ANALYSIS_OUT` (default `results/own/overnight`) to keep each campaign's results separate, e.g. `results/own/flat4_healthy`. Other tools:
+- `session_check.py`: one-line check of a session against the campaign's first mount check.
+- `compare_mounts.py`: two sessions compared per step and per axis.
+- `axes_check.py`: per-axis 0.5×, 1× and 2×.
+- `speed_check.py`: tach vs gyro vs audio speed.
+- `fault_check.py`: test sessions vs healthy references.
+- `abtest.py`: the A-B-A analysis.
 
 Results in this folder:
 
