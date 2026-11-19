@@ -17,6 +17,16 @@ a B between two A blocks has 3/4 of the variance of an A-to-A ratio if block noi
 Severity strings like "0.1g@25mm" give unbalance U = m * r in g*mm for the dose-response.
 Secondary measures, same tables: axial accel 1x (the board axis not in --inplane), accel 1x over all axes,
 gyro 1x over all axes.
+Blockage and rub measures (added 20 Nov, before any blockage or rub data), same tables, judged two-sided
+(|combined z| >= 3) because the direction is not known in advance:
+- rpm: speed at the step's PWM (a blocked intake changes the load); its spread floor is RPM_SD_FLOOR, not SD_FLOOR;
+- acc7x_vec: accelerometer blade-pass tone (7 blades) over all axes;
+- acc_hf: accelerometer 150-400 Hz band over all axes (impacts, broadband);
+- aud_rms: audio level; aud7x: audio blade-pass tone; aud_hi: audio 2-7.9 kHz band, median of 1 s chunks (ticks).
+Pre-registered primary per fault: intake blockage -> rpm; blade rub -> aud_hi. The others are descriptive.
+--null-from <abtest json> (added 20 Nov, before any fault data): a run on healthy blocks only (the 25 pre-night
+blocks). Every spread used for z is then max(own A-to-A spread, that run's spread, floor), per step and combined,
+so a short run with only 3-4 A blocks can't get a small spread by chance. It can only lower z.
 History: combined effect, spread floor and secondaries added 19 Nov after a healthy dry run on flat4 (the 60 %
 step is speed-sensitive there and the 1x is mostly axial); NaN handling, step union, input checks and the
 empirical combined null added the same day after a code review. All before any fault data.
@@ -29,6 +39,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+from scipy.signal import butter, sosfiltfilt
 
 sys.path.insert(0, str(Path(__file__).parent))
 from explore import Session, psd  # noqa: E402
@@ -38,8 +49,15 @@ COMBINE = ("duty50", "duty60", "duty70", "duty80")  # steps pooled into one effe
 # Floor on the A-to-A spread: with few A blocks a step can show a tiny spread by chance (z in the hundreds).
 # 0.02 log10 (about 5 %) is the best step-to-step repeatability seen on healthy flat4 sweeps (19 Nov).
 SD_FLOOR = 0.02
+# Speed at a fixed PWM repeats far better than any amplitude, so 0.02 would hide a real speed change. The floor
+# is the combined A-to-A rpm spread of 25 healthy pre-night ab_block blocks (19 Nov, 19:13-00:35): 0.0010
+# log10 (0.24 %); single steps 0.0011-0.0013. z = 3 is then a speed change of about 0.7 %.
+RPM_SD_FLOOR = 0.001
+BLADES = 7
+FAULT_MEASURES = ("rpm", "acc7x_vec", "acc_hf", "aud_rms", "aud7x", "aud_hi")  # two-sided
 Z_DETECT = 3.0
 MIN_STEP_S = 60
+NULL_FROM = {}  # measure -> {"null_sd": {step: sd}, "null_sd_combined": sd} from --null-from
 
 
 def good(x):
@@ -80,6 +98,22 @@ def block(sd, inplane):
             r[f"{name}_inplane"] = float(np.sqrt(sum(r[f"{name}1x"][a] ** 2 for a in ip)))
             r[f"{name}_axial"] = float(np.sqrt(sum(r[f"{name}1x"][a] ** 2 for a in ax_)))
             r[f"{name}_vec"] = float(np.sqrt(sum(v ** 2 for v in r[f"{name}1x"])))
+            if name == "acc":
+                tb = max(0.6, 0.01 * BLADES * f1)
+                r["acc7x_vec"] = float(np.sqrt(sum(band_rms(f, p[:, a], BLADES * f1, tb) ** 2 for a in range(3)))) * scale
+                m = (f >= 150) & (f < 400)
+                r["acc_hf"] = float(np.sqrt(p[m].sum() * (f[1] - f[0]))) * scale
+        x = s.slice("audio", seg["t0"], seg["t1"]) if s.audio is not None else None
+        fa = s.stream_rate("audio")
+        if x is not None and len(x) > 65536 and np.isfinite(fa) and np.isfinite(f1):
+            r["aud_rms"] = float(np.std(x))
+            f, p = psd(x, fa, 65536)
+            r["aud7x"] = band_rms(f, p[:, 0], BLADES * f1, max(0.6, 0.01 * BLADES * f1))
+            # median of 1 s chunks: a steady rub survives, a brief room sound does not (healthy pre-night blocks:
+            # A-to-A spread at 70/80 % 0.010/0.006 log10, against 0.10/0.044 for the plain band RMS)
+            h = sosfiltfilt(butter(4, [2000, min(7900, 0.49 * fa)], btype="band", fs=fa, output="sos"), x - np.mean(x))
+            n = int(fa)
+            r["aud_hi"] = float(np.median(np.sqrt(np.mean(h[: len(h) // n * n].reshape(-1, n) ** 2, axis=1))))
         rows[seg["label"]] = {"duty": d, **r}
     prof = meta.get("profile")
     return {"name": s.dir.name, "kind": "A" if meta.get("fault") == "normal" else "B",
@@ -114,7 +148,7 @@ def checks(blocks, steps):
     return warn
 
 
-def effects(blocks, steps, measure, verbose=True):
+def effects(blocks, steps, measure, verbose=True, two_sided=False):
     A = [i for i, b in enumerate(blocks) if b["kind"] == "A"]
     pairs = list(zip(A[:-1], A[1:]))
 
@@ -124,7 +158,14 @@ def effects(blocks, steps, measure, verbose=True):
 
     null = {k: [v for v in (lr_pair(i, j, k) for i, j in pairs) if np.isfinite(v)] for k in steps}
     sd_null = {k: (float(np.std(v, ddof=1)) if len(v) > 1 else np.nan) for k, v in null.items()}
-    sd_use = {k: max(v, SD_FLOOR) if np.isfinite(v) else np.nan for k, v in sd_null.items()}
+    floor = RPM_SD_FLOOR if measure == "rpm" else SD_FLOOR
+    ext = NULL_FROM.get(measure, {})
+
+    def use(own, other):  # max of own spread, --null-from spread and floor; NaN if neither spread exists
+        vals = [v for v in (own, other) if v is not None and np.isfinite(v)]
+        return max(vals + [floor]) if vals else np.nan
+
+    sd_use = {k: use(v, (ext.get("null_sd") or {}).get(k)) for k, v in sd_null.items()}
     w = {k: 1 / sd_use[k] ** 2 for k in COMBINE if k in sd_use and np.isfinite(sd_use[k])}
 
     def combine(lrs):  # weighted mean over the COMBINE steps present
@@ -133,10 +174,10 @@ def effects(blocks, steps, measure, verbose=True):
 
     comb_null = [combine({k: lr_pair(i, j, k) for k in w}) for i, j in pairs]
     comb_null = [v for v in comb_null if np.isfinite(v)]
-    sd_comb = max(float(np.std(comb_null, ddof=1)), SD_FLOOR) if len(comb_null) > 1 else np.nan
+    sd_comb = use(float(np.std(comb_null, ddof=1)) if len(comb_null) > 1 else np.nan, ext.get("null_sd_combined"))
     if verbose:
-        print(f"\nA-to-A spread of {measure} (sd of log10 ratio over {len(pairs)} pairs; z uses max(sd, {SD_FLOOR})): "
-              + " ".join(f"{k} {v:.3f}" for k, v in sd_null.items()) + f" | combined {sd_comb:.3f}")
+        print(f"\nA-to-A spread of {measure} (sd of log10 ratio over {len(pairs)} pairs; z uses max(sd, {'--null-from, ' if ext else ''}{floor})): "
+              + " ".join(f"{k} {v:.4f}" for k, v in sd_null.items()) + f" | combined (used) {sd_comb:.4f}")
     res = []
     for i, b in enumerate(blocks):
         if b["kind"] != "B":
@@ -162,13 +203,13 @@ def effects(blocks, steps, measure, verbose=True):
         zc = c / sd_comb if np.isfinite(c) and np.isfinite(sd_comb) else np.nan
         res.append({"measure": measure, "block": b["name"], "severity": b["severity"], "U": b["U"],
                     "step": "combined", "ratio": float(10 ** c) if np.isfinite(c) else np.nan, "z": zc,
-                    "detected": bool(np.isfinite(zc) and zc >= Z_DETECT)})
+                    "detected": bool(np.isfinite(zc) and (abs(zc) if two_sided else zc) >= Z_DETECT)})
         if verbose:
-            flag = "DETECTED" if np.isfinite(zc) and zc >= Z_DETECT else ""
-            ctrl = " (control)" if not np.isfinite(b["U"]) else ""
+            flag = "DETECTED" if res[-1]["detected"] else ""
+            ctrl = " (control)" if b["fault"] == "other" else ""
             print(f"{b['name'][9:15]} {b['severity'] + ctrl:>22}: " + " ".join(cells)
                   + f"  | combined 50-80 % x{10 ** c if np.isfinite(c) else np.nan:5.2f} z{zc:+6.1f} {flag}")
-    return {"null_sd": sd_null, "null_sd_combined": sd_comb, "effects": res}
+    return {"null_sd": sd_null, "null_sd_used": sd_use, "null_sd_combined": sd_comb, "effects": res}
 
 
 def clean(o):
@@ -190,7 +231,12 @@ def main():
     ap.add_argument("--inplane", default="xz", help="board axes in the rotor plane (flat4: xz)")
     ap.add_argument("--fig")
     ap.add_argument("--out", help="results JSON (default results/own/abtest/<first session>.json)")
+    ap.add_argument("--null-from", help="abtest JSON of a healthy-only run whose spreads act as a minimum")
     args = ap.parse_args()
+    if args.null_from:
+        j = json.loads(Path(args.null_from).read_text())
+        NULL_FROM["acc_inplane"] = {"null_sd": j["null_sd"], "null_sd_combined": j["null_sd_combined"]}
+        NULL_FROM.update(j.get("secondary", {}))
     blocks = [block(sd, args.inplane) for sd in args.sessions]
     steps = sorted({k for b in blocks for k in b["steps"] if k.startswith("duty")}, key=lambda k: int(k[4:]))
 
@@ -210,11 +256,15 @@ def main():
     for m in ("acc_axial", "acc_vec", "gyr_vec"):
         print(f"\nsecondary: {m}")
         secondary[m] = effects(blocks, steps, m)
+    for m in FAULT_MEASURES:
+        print(f"\nblockage/rub measure (two-sided): {m}")
+        secondary[m] = effects(blocks, steps, m, two_sided=True)
 
     out = Path(args.out) if args.out else Path("results/own/abtest") / f"{Path(args.sessions[0]).name}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(clean({"blocks": blocks, "steps": steps, "warnings": checks(blocks, steps),
-                                     "z_detect": Z_DETECT, "sd_floor": SD_FLOOR, **primary,
+                                     "z_detect": Z_DETECT, "sd_floor": SD_FLOOR, "rpm_sd_floor": RPM_SD_FLOOR, "null_from": args.null_from,
+                                     "two_sided": list(FAULT_MEASURES), **primary,
                                      "secondary": secondary}), indent=1))
     print("\nwrote", out)
 

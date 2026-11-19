@@ -32,7 +32,7 @@ from .protocol import FrameParser, FrameType, decode_info, decode_status
 from .session import convert
 
 BOARD_VIDS = {0x239A: "Adafruit", 0x2341: "Arduino"}  # USB vendor IDs of supported boards
-FAULTS = ("normal", "imbalance", "blade_damage", "loose_mount", "bearing_wear", "obstruction", "other")
+FAULTS = ("normal", "imbalance", "blade_damage", "loose_mount", "bearing_wear", "obstruction", "rub", "other")
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
