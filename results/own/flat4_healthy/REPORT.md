@@ -74,6 +74,8 @@ The synthetic test also overstates the problem at low speed. Multiplying a backg
 - **No single window is enough.** Without the running median, L catches ×1.5 at 70–80 % only 59–64 % of the time: one 5 s window is not enough, and the median over 8 overlapping windows (about 9 s) is needed.
 - **A spread floor of 0.03 log10** (`feature_eval_grid10L_rot_f03.json`) lowers false alarms to about 1 %, but drops L's ×1.5 detection at 70–80 % to 14 %: the floor is larger than the 1× spread there. Don't use a uniform floor. If a floor is needed, set it per feature (for example only for 12× and the 150–400 Hz band).
 - **Oall (vector orders) stays blind** (≤ 7 % at ×2), as on `tapeCorner`. Features must be per axis.
+- **The streaming variant also works** (`feature_eval_grid10L_rot_sub8.json`, `--subsample 8 --avg 3`): non-overlapping 5 s windows, as a running single-bin DFT on the board would give, with a median of 3 (15 s). L catches ×1.5 at 70 / 80 % 81 / 84 % of the time with max|z|, 94 / 93 % with Mahalanobis and 80 / 87 % with the AE, at 1.9–2.7 % false alarms. That is close to the overlapping version, with no sample buffer and slower decisions.
+- **False alarms per window are not per hour.** 2 % of 0.62 s windows is about 116 flags an hour; 2 % of 5 s windows is about 14 an hour. Either way a single flag can't trigger ALERT. Persistence over several windows, which is in the RL state, has to do that work.
 
 ## Unseen speeds
 

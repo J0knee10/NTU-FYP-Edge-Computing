@@ -26,6 +26,8 @@ Method:
 - **Spread floor.** `--spread-floor` (log10 units) stops very stable features from dominating max|z|.
 - **Rotation.** `--rotate` repeats the test with each sweep-type training session as the threshold session
   and reports mean [min-max]: one threshold session alone makes the numbers swing.
+- **Subsampling.** `--subsample 8` keeps every 8th row: with 4096-sample long windows that is non-overlapping
+  5 s windows, as a streaming single-bin DFT on the board would give (no sample buffer).
 - **Averaging.** Optionally a running median of `avg` consecutive windows (same session and duty) before
   scoring, as the board would do over ~5 s.
 """
@@ -130,7 +132,7 @@ class SpeedNorm:
             per = []
             for s_ in np.unique(sess[md]):
                 vs = F[md & (sess == s_)]
-                if len(vs) >= 20:
+                if len(vs) >= max(5, 20 // SUBSAMPLE):  # enough windows for a within-session spread
                     ms = np.nanmedian(vs, 0)
                     per.append(ms)
                     sw.append(1.4826 * np.nanmedian(np.abs(vs - ms), 0))
@@ -173,11 +175,15 @@ def detectors(Ztr, seeds):
     return dets
 
 
+SUBSAMPLE = 1  # --subsample k: keep every k-th row (8 with 512-sample rows = non-overlapping 4096 windows)
+
+
 def gather(tabs, sel, set_name, duties):
     F, lr, duty, grp, ss, ip = [], [], [], [], [], []
     for i in sel:
         t = tabs[i]
         m = t["settled"] & t.get("settled_long", True) & np.isfinite(t["rpm"]) & np.isin(t["pwm"], duties)
+        m &= np.arange(len(m)) % SUBSAMPLE == 0
         F.append(feature_sets(t)[set_name][m])
         lr.append(np.log10(t["rpm"][m]))
         duty.append(t["pwm"][m])
@@ -276,9 +282,11 @@ def main():
     ap.add_argument("--tag", default="", help="suffix for the output file name")
     ap.add_argument("--spread-floor", type=float, default=1e-3, help="minimum spread per feature, log10 units")
     ap.add_argument("--rotate", action="store_true", help="each sweep-type training session as threshold session in turn")
+    ap.add_argument("--subsample", type=int, default=1, help="keep every k-th window row (emulates a longer hop)")
     args = ap.parse_args()
-    global SPREAD_FLOOR
+    global SPREAD_FLOOR, SUBSAMPLE
     SPREAD_FLOOR = args.spread_floor
+    SUBSAMPLE = args.subsample
     a, b, c = (int(v) for v in args.duties.split(":"))
     duties = tuple(range(a, b + 1, c))
     lo, hi = (int(v) for v in args.lodo.split(":"))
@@ -297,6 +305,7 @@ def main():
         print(f"rotating the threshold session over {[str(tabs[i]['name']) for i in sweepish]}")
         res = rotate(tabs, ntr, sweepish, test_idx, duties, sorted({1, args.avg}), args.seeds)
         res["_config"] = {"duties": list(duties), "avg": args.avg, "seeds": args.seeds, "spread_floor": SPREAD_FLOOR,
+                          "subsample": SUBSAMPLE,
                           "long_windows": "acc_axis_long" in tabs[0], "rotate": True,
                           "threshold_sessions": [str(tabs[i]["name"]) for i in sweepish],
                           "test": [str(tabs[i]["name"]) for i in test_idx]}

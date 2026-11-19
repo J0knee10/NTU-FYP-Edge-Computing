@@ -119,11 +119,13 @@ All are log10, normalised by the speed table, then scored by max|z| or a small a
 - **FFT approach:**
   - **RAM:** a 4096-sample int16 ring buffer for accel and gyro is 48 KB, plus a 16 KB float FFT buffer.
   - **CPU:** CMSIS `arm_rfft_fast_f32` at 4096 points per axis, 6 per 0.62 s hop, is roughly 10 ms of CPU per hop (about 2 %).
-- **Streaming approach (no sample buffer):** non-overlapping 5 s windows with a running single-bin DFT per order and axis, and a median over 3 windows (about 15 s). This variant has not been evaluated yet.
+- **Streaming approach (no sample buffer):** non-overlapping 5 s windows with a running single-bin DFT per order and axis, and a median over 3 windows (about 15 s).
+  - **Evaluated on 19 Nov** (`--subsample 8 --avg 3`): ×1.5 at 70–80 % is caught 80–94 % of the time depending on the detector, at about 2 % false alarms per window. That is almost as good as the overlapping version.
+  - Cost per window: 6 orders × 3 axes × 2 sensors × (a few bins) complex MACs per sample, with no FFT and no buffer.
 
 **Still to do:**
 - Re-run on the real fault blocks (`fault_eval.py`).
-- Evaluate the streaming variant.
+- Choose FFT-with-overlap or streaming. Streaming is cheaper and nearly as good on the synthetic test.
 - Check the 60 % step after the anti-alias firmware (0.4.0).
 - Port into `host/features/` (`spec.py`, `extract.py`) once decided.
 
