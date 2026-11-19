@@ -98,7 +98,14 @@ python host/analysis/abtest.py --inplane xz --fig results/own/abtest/2026-11-19.
 - **Dose-response:** the combined ratio vs U (g·mm), and the added 1× in mg (B − A) vs ω², one line per block. Below the ~40 Hz bounce of the mount, the added 1× should grow roughly in proportion to U·ω². B − A is only a rough stand-in for the added vector: the measure has no phase, so the added and existing imbalance can partly cancel.
 - **Secondary:**
   - the same tables for axial accel 1× (board y), accel 1× over all axes, and gyro 1× over all axes (`abtest.py` prints them);
-  - the autoencoder on order features, trained on healthy `flat4` data with its threshold set on a held-out session; detection rate per mass and duty;
+  - per-window detection (`host/analysis/fault_eval.py`): detectors trained on the healthy `flat4` campaign, with the threshold rotated over its sweep-type sessions. It reports the % of windows flagged per block and duty, for feature sets O (0.62 s orders) and L (5 s tach-locked orders), with max|z|, Mahalanobis and the autoencoder. Commands (after the last block; give the block session folders in order):
+    ```
+    $env:ANALYSIS_OUT="results/own/flat4_healthy"; python host/analysis/long_windows.py
+    $env:ANALYSIS_OUT="results/own/abtest_20261119"; python host/analysis/windows.py <blocks>
+    python host/analysis/long_windows.py <blocks>
+    python host/analysis/fault_eval.py --train results/own/flat4_healthy
+    ```
+    Tested on fake blocks: the injected block was flagged in 27–73 % of windows at 50–80 % with L (much less with O); healthy and relabelled blocks were flagged in 0–6 %.
   - accel 2× and 0.5×.
 
 ## Dry run on healthy flat4 data (19 Nov, afternoon, before any fault data)

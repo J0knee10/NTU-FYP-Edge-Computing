@@ -1,6 +1,7 @@
 """Long tach-locked order amplitudes for every row of the window tables (sidecar files).
 
-usage: python host/analysis/long_windows.py [--len 4096]      (reads ANALYSIS_OUT/windows/*.npz)
+usage: python host/analysis/long_windows.py [--len 4096] [session_dir ...]
+       (default: every table in ANALYSIS_OUT/windows/, raw sessions from data/raw/)
 
 For each short window (row) of a session table, takes LEN IMU samples centred on it and measures per-axis
 narrowband RMS at the orders AX_ORDERS (0.5, 1, 1.5, 2, 3, 7) of the tach speed, in +-2 bins (Hann), for the
@@ -42,10 +43,9 @@ def narrow_orders(x, fs, f1, orders):
     return out
 
 
-def build(table, L):
+def build(table, L, raw_dir):
     t = np.load(table, allow_pickle=True)
-    name = Path(table).stem
-    s = Session(RAW / name)
+    s = Session(raw_dir)
     fs = s.stream_rate("imu")
     n = len(t["tc"])
     acc_l = np.full((n, 3, len(AX_ORDERS)), np.nan)
@@ -70,17 +70,22 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--len", type=int, default=4096)
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("sessions", nargs="*", help="raw session dirs (their tables must exist)")
     args = ap.parse_args()
     out = OUT / "windows_long"
     out.mkdir(parents=True, exist_ok=True)
-    for table in sorted(glob.glob(str(OUT / "windows" / "*.npz"))):
+    if args.sessions:
+        pairs = [(str(OUT / "windows" / f"{Path(sd).name}.npz"), Path(sd)) for sd in args.sessions]
+    else:
+        pairs = [(t, RAW / Path(t).stem) for t in sorted(glob.glob(str(OUT / "windows" / "*.npz")))]
+    for table, raw_dir in pairs:
         dst = out / Path(table).name
         if dst.exists() and not args.force:
             continue
-        if not (RAW / Path(table).stem).exists():
-            print("no raw session for", Path(table).stem)
+        if not raw_dir.exists() or not Path(table).exists():
+            print("missing raw session or table for", raw_dir.name)
             continue
-        acc_l, gyr_l, settled_l = build(table, args.len)
+        acc_l, gyr_l, settled_l = build(table, args.len, raw_dir)
         np.savez_compressed(dst, acc_axis_long=acc_l, gyr_axis_long=gyr_l, settled_long=settled_l,
                             long_len=args.len)
         print(f"{Path(table).stem}: {settled_l.sum()} settled long windows of {len(settled_l)}", flush=True)
