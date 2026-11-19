@@ -85,9 +85,17 @@ python host/analysis/abtest.py --inplane xz --fig results/own/abtest/2026-11-19.
 ```
 
 - **Primary measure:** in-plane accelerometer 1× RMS, sqrt(x² + z²) in mg. On `flat4` the rotor plane is board x/z. It is measured at 50, 60, 70 and 80 %, from a per-axis Welch spectrum of each step at the tach speed.
-- **Effect:** each B block divided by the geometric mean of the nearest A before and after, compared with the spread of A-to-A ratios (sham and hub control included). It is reported as a ratio and as z.
-- **Combined effect per block:** one ratio and z over the 50, 60, 70 and 80 % steps, weighting each step by 1 / sd² of its A-to-A spread. The spread used in every z is floored at 0.02 log10 (about 5 %), so a step whose few A-to-A ratios happen to agree closely can't give z in the hundreds. The combined z treats steps as independent, so a drift common to all steps makes it optimistic.
-- **Dose-response:** the ratio vs U (g·mm) and vs ω². Below the ~40 Hz bounce of the mount, the added 1× should grow roughly in proportion to U·ω².
+- **Effect:** each B block divided by the geometric mean of the nearest A before and after, compared with the spread of consecutive A-to-A ratios. It is reported as a ratio and as z.
+  - The sham block (A1, fault `normal`) counts as an A, so its handling is part of the null.
+  - The hub-mass block (H, fault `other`) is analysed like a B, as a **no-effect control**. It should show no effect. It is not in the null.
+- **Combined effect per block:** one ratio over the 50, 60, 70 and 80 % steps, the mean of the step log ratios weighted by 1 / sd² of each step's A-to-A spread.
+  - Its z uses the spread of the same weighted mean over the consecutive A pairs, so a drift common to all steps is included.
+  - Every spread is floored at 0.02 log10 (about 5 %), so a step whose few A-to-A ratios happen to agree closely can't give z in the hundreds.
+- **Decision rule (fixed before the data):** an effect counts as detected if the combined z ≥ 3. The sham and the hub control must stay below that.
+  - With 6 A-to-A pairs, the spread has 5 degrees of freedom, so z = 3 corresponds to about p = 0.015 one-sided (t distribution).
+  - z is conservative. If block noise is independent, a B between two A blocks has 3/4 of the variance of an A-to-A ratio, so the true z is about 1.15× larger.
+- **Input checks:** `abtest.py` warns if a block is not `ab_block`, was aborted, has a step shorter than 60 s or a missing step, or if the sessions are not in time order. Pass the sessions in recorded order.
+- **Dose-response:** the combined ratio vs U (g·mm), and the added 1× in mg (B − A) vs ω², one line per block. Below the ~40 Hz bounce of the mount, the added 1× should grow roughly in proportion to U·ω². B − A is only a rough stand-in for the added vector: the measure has no phase, so the added and existing imbalance can partly cancel.
 - **Secondary:**
   - the same tables for axial accel 1× (board y), accel 1× over all axes, and gyro 1× over all axes (`abtest.py` prints them);
   - the autoencoder on order features, trained on healthy `flat4` data with its threshold set on a held-out session; detection rate per mass and duty;
@@ -107,6 +115,12 @@ python host/analysis/abtest.py --inplane xz --fig results/own/abtest/2026-11-19.
 - **The fan's own 1× is mostly axial on `flat4`.** Board y is 1.7 mg at 50 % and 9 mg at 70 %: the corner of the frame rocks. Hence the axial and all-axis secondaries. An added blade mass adds a rocking moment as well as an in-plane force.
 - **Speed creeps up over the day:** about +1 % at fixed duty between 09:00 and 14:00. Each B is compared with its neighbouring A blocks, so this cancels.
 - **Fake B blocks:**
-  - A healthy block relabelled as B gives combined ×0.97, z −0.8, and |z| ≤ 1.5 on every secondary.
-  - A healthy block with an added tach-locked 1× sine (0.5 mg RMS per in-plane axis at 50 %, growing with ω²) gives ×1.56 at 50 %, ×1.21 at 70 % and combined ×1.38, z +8.7.
+  - A healthy block relabelled as B gives combined ×0.97, z −0.6, and |z| ≤ 1.5 on every secondary.
+  - A healthy block with an added tach-locked 1× sine (0.5 mg RMS per in-plane axis at 50 %, growing with ω²) gives ×1.56 at 50 %, ×1.21 at 70 % and combined ×1.38, z +7.0 (detected).
+  - These z values use the final script, after the code review the same afternoon. That review fixed:
+    - NaN handling;
+    - steps taken from the first block only;
+    - the combined z, which had treated steps as independent;
+    - the figure;
+    - added the input checks.
   - The fake blocks were made with `fake_b.py`, a scratch script, not in the repo.
