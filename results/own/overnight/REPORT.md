@@ -218,6 +218,20 @@ What this shows (all on the old rocking mount, with a synthetic fault; to be rep
   - Average over about 5 s before scoring.
   - Choose the set by detection rate at a fixed false-alarm rate, not by false alarms alone.
 
+**Update, 19 Nov afternoon: threshold rotation and 5 s windows.**
+
+One held-out threshold session (03:14) turned out to make the numbers swing. `feature_eval.py --rotate` repeats the test with each sweep-type training session as the threshold session (4 on this night) and reports mean [min–max]. It also adds set L: the same 11 features, with orders from 5 s (4096-sample) tach-locked windows (`long_windows.py`). All sets are then scored on the same rows. For this logger version (0.3.0) the speed is the audio-refined one.
+
+| Set, 8-window median, max\|z\| | False alarms | ×1.25 | ×1.5 | ×2 | ×1.5 at 40 / 50 / 60 / 70 / 80 % |
+|---|---|---|---|---|---|---|
+| O (0.62 s orders) | 6.3 [1.4–14.3] % | 16 | 52 [20–97] | 99.8 | 60 / 35 / 69 / 50 / 36 |
+| **L (5 s orders)** | **3.0 [1.1–5.8] %** | 16 | **70 [47–100]** | 99.0 | 99 / 100 / 94 / 57 / 29 |
+| L, streaming (non-overlapping 5 s, median of 3) | 3.2 [0.2–9.9] % | 31 | 78 [17–99] | 99.8 | 100 / 82 / 76 / 75 / 75 |
+
+- **The 1.3 % false-alarm figure in the table above came from a favourable threshold session.** Rotated, O's false alarms average 6.3 % (1.4–14 %).
+- **The 5 s windows halve the false alarms and raise ×1.5 detection on this mount too.** On `flat4` they matter most at 70–80 %; here they matter at 40–60 %.
+- Files: `feature_eval_L_rot.json`, `feature_eval_L_rot_sub8.json`. The `flat4` results are in `results/own/flat4_healthy/REPORT.md`.
+
 ## 8. Placement verdict (`tapeCorner`, retired 19 Nov)
 
 The fan was moved to the flat `flat4` mount on the morning of 19 Nov, which removed the rocking described below (see `docs/setup/bench_setup.md`). At the time the verdict was to keep the tape placement for the fault test. It passed everything that matters:

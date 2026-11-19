@@ -98,6 +98,7 @@ The evidence is from two healthy campaigns, `tapeCorner` and `flat4` (reports in
   - On the quiet `flat4` mount the fan's own 1× is near the background in a 0.62 s window below about 60 % speed.
   - A 5 s (4096-sample) tach-locked window narrows the band, so a stable 1× line shows from 50 % up.
   - Result: with an 8-window running median, ×1.5 in-plane is caught 90–99 % of the time at 70–80 %, against 20–30 % with 0.62 s windows, at about 2 % false alarms.
+  - **On `tapeCorner` too**, where the 1× is large at every speed, 5 s windows halve the false alarms (3.0 % vs 6.3 %, rotated thresholds) and raise ×1.5 detection from 52 % to 70 %. So the gain is not specific to the quiet mount.
 - **Speed-conditioned normalisation works.** Each feature's healthy median and spread is learned per duty and interpolated in log rpm, with the spread = within- and between-session spread combined. On the board this is one small table per feature.
 - **Some speeds stay hard.** At 30–40 % there is no 1× above the background even at 10 s, because imbalance force scales with ω². An unseen speed between grid points still raises false alarms. Both are jobs for the RL agent: speed as context, ADAPT at a new speed.
 

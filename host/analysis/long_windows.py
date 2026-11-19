@@ -22,7 +22,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
 from explore import Session  # noqa: E402
-from windows import AX_ORDERS, HANN_RMS, W, tach_rpm  # noqa: E402
+from windows import AX_ORDERS, HANN_RMS, W, has_tach_edges, tach_rpm  # noqa: E402
 
 OUT = Path(os.environ.get("ANALYSIS_OUT", "results/own/overnight"))
 RAW = Path("data/raw")
@@ -53,7 +53,10 @@ def build(table, L, raw_dir):
     settled_l = np.zeros(n, bool)
     half_rows = L // W // 2
     pwm, settled = t["pwm"], t["settled"]
-    f1 = tach_rpm(s, t["tc"], half=L / fs / 2) / 60
+    if has_tach_edges(s):  # logger >= 0.3.1: crystal-timed tach edges, averaged over the long window
+        f1 = tach_rpm(s, t["tc"], half=L / fs / 2) / 60
+    else:  # logger 0.3.0: its tach read 1-1.6 % high; use the table's speed (audio-refined)
+        f1 = np.asarray(t["rpm"], float) / 60
     for i in range(n):
         a = i * W + W // 2 - L // 2
         if a < 0 or a + L > len(s.acc) or not np.isfinite(f1[i]):
