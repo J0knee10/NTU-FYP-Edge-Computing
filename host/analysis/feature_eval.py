@@ -287,9 +287,10 @@ def evaluate(tabs, train_idx, th_idx, test_idx, duties, set_name, avg, seeds, lo
 LOSO_Q = (0.99, 0.995, 0.999)
 
 
-def loso(tabs, train_idx, test_idx, duties, set_name, avg):
-    """Threshold from leave-one-session-out scores pooled over the training sessions (see module docstring)."""
-    dnames = ("max|z|", "Mahalanobis")
+def loso_calibrate(tabs, train_idx, set_name, duties, avg, dnames=("max|z|", "Mahalanobis")):
+    """Leave-one-session-out calibration: each training session scored by a model fitted on the others.
+    Returns (norm, dets) fitted on every training session, the pooled out-of-session scores per detector, and
+    the number of sessions that contributed."""
     oos = {d: [] for d in dnames}
     for s in train_idx:
         g = gather(tabs, [s], set_name, duties, avg)
@@ -301,9 +302,16 @@ def loso(tabs, train_idx, test_idx, duties, set_name, avg):
         for d in dnames:
             oos[d].append(dets[d](norm(g[0], g[1])))
     tr = gather(tabs, train_idx, set_name, duties, avg)
-    te = gather(tabs, test_idx, set_name, duties, avg)
     norm = SpeedNorm(*tr)
     dets = detectors(norm(tr[0], tr[1]), 0)
+    return norm, dets, {d: np.concatenate(v) for d, v in oos.items()}, len(oos[dnames[0]])
+
+
+def loso(tabs, train_idx, test_idx, duties, set_name, avg):
+    """Threshold from leave-one-session-out scores pooled over the training sessions (see module docstring)."""
+    dnames = ("max|z|", "Mahalanobis")
+    norm, dets, oos, ncal = loso_calibrate(tabs, train_idx, set_name, duties, avg, dnames)
+    te = gather(tabs, test_idx, set_name, duties, avg)
     Zte = norm(te[0], te[1])
     inj = (te[2] >= 400) & (te[2] <= 800)
     Zi = {}
@@ -311,9 +319,9 @@ def loso(tabs, train_idx, test_idx, duties, set_name, avg):
         g = gather(tabs, test_idx, set_name, duties, avg, fac)
         if g is not None:
             Zi[fac] = norm(g[0], g[1])
-    out = {"calibration_sessions": len(oos[dnames[0]])}
+    out = {"calibration_sessions": ncal}
     for d in dnames:
-        sc = np.concatenate(oos[d])
+        sc = oos[d]
         s_te = dets[d](Zte)
         for q in LOSO_Q:
             thr = float(np.quantile(sc, q))

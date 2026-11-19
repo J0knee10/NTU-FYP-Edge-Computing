@@ -106,6 +106,10 @@ python host/analysis/abtest.py --inplane xz --fig results/own/abtest/2026-11-19.
     python host/analysis/fault_eval.py --train results/own/flat4_healthy
     ```
     Tested on fake blocks: the injected block was flagged in 27–73 % of windows at 50–80 % with L (much less with O); healthy and relabelled blocks were flagged in 0–6 %.
+  - **Per-window threshold (changed 19 Nov, 19:35, before any fault data).** The main per-window result is the "max|z| LOSO" row, set L. It is fitted on all 31 healthy `flat4` sessions; the threshold is the 99.5th percentile of the pooled leave-one-session-out scores (`feature_eval.py --loso`).
+    - On the later `flat4` sessions this gave 1.3 % false alarms and caught every synthetic ×1.5 at 70–80 %.
+    - On pre-night healthy `ab_block` block 1 it flagged 0 % of windows at every duty. The rotated Mahalanobis and AE thresholds flagged 19–41 % at 50 % on the same block.
+    - The rotated rows stay in the output for comparison only.
   - accel 2× and 0.5×.
 
 ## Dry run on healthy flat4 data (19 Nov, afternoon, before any fault data)
