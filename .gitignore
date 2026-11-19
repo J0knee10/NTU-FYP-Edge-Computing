@@ -283,3 +283,6 @@ $RECYCLE.BIN/
 
 # Arduino build output
 firmware/**/build/
+
+# Per-window feature caches (rebuild with host/analysis/windows.py)
+results/own/*/windows/

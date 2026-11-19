@@ -151,7 +151,9 @@ def live_line(link: BoardLink, ppr: int) -> str:
     if not s or not p:
         return "waiting for status..."
     dt = ((s["t_us"] - p["t_us"]) & 0xFFFFFFFF) / 1e6 or float("nan")
-    rpm = (s["tach_pulses"] - p["tach_pulses"]) / ppr / dt * 60
+    dp = s["tach_pulses"] - p["tach_pulses"]
+    de = ((s["tach_edge_us"] - p["tach_edge_us"]) & 0xFFFFFFFF) / 1e6
+    rpm = dp / ppr / (de if dp and de else dt) * 60  # exact edge time on logger >= 0.3.1
     imu_rate = (s["imu_samples"] - p["imu_samples"]) / dt
     temp = s["temp_centi_c"] / 100 if s["temp_centi_c"] != -32768 else float("nan")
     return (

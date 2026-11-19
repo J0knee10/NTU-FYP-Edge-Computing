@@ -8,11 +8,13 @@ from fanlog.session import convert, unwrap_u32
 RATE_HZ = 952.0
 
 
-def _write_session(tmp_path, n_batches=60, drop_batch=None, t0_us=0xFFFFFFFF - 20_000):
+def _write_session(tmp_path, n_batches=60, drop_batch=None, t0_us=0xFFFFFFFF - 20_000, rpm=3000.0, edges=False):
     """Simulate the firmware: 32-sample IMU batches, 4 Hz status, audio chunks.
 
-    t0_us starts just before the uint32 wrap so conversion must unwrap it.
+    t0_us starts just before the uint32 wrap so conversion must unwrap it. With edges=True the
+    STATUS frames carry the time of the last tach edge, as logger >= 0.3.1 does.
     """
+    pps = rpm / 60 * 2  # tach pulses per second, 2 per revolution
     rng = np.random.default_rng(0)
     seq = 0
     out = bytearray()
@@ -28,13 +30,15 @@ def _write_session(tmp_path, n_batches=60, drop_batch=None, t0_us=0xFFFFFFFF - 2
         first = b * 32
         t_rel = (first + 31) / RATE_HZ * 1e6
         while next_status_us <= t_rel:
-            pulses = int(next_status_us / 1e6 * 50 * 2)  # 3000 rpm, 2 pulses/rev
+            pulses = int(next_status_us / 1e6 * pps)
+            edge_us = (t0_us + round(pulses / pps * 1e6)) & 0xFFFFFFFF if edges else 0
             frame(
                 FrameType.STATUS,
                 encode_status(
                     t_us=(t0_us + int(next_status_us)) & 0xFFFFFFFF,
                     imu_samples=first,
                     tach_pulses=pulses,
+                    tach_edge_us=edge_us,
                     pwm_permille=700,
                 ),
             )
@@ -70,6 +74,13 @@ def test_convert_clean_session(tmp_path):
     assert np.nanmedian(data["status_rpm"]) == np.float64(3000.0)
     assert np.isclose(data["imu_g_per_count"], 0.000122)
     assert summary["audio_samples"] == 15 * 256
+
+
+def test_rpm_from_tach_edge_times_is_exact(tmp_path):
+    # 1817 rpm gives 15 or 16 pulses per 250 ms STATUS: 1800 or 1920 rpm from STATUS time alone.
+    convert(_write_session(tmp_path, n_batches=120, rpm=1817.0, edges=True))
+    rpm = np.load(tmp_path / "session.npz")["status_rpm"][2:]
+    assert np.all(np.abs(rpm - 1817.0) < 0.5)
 
 
 def test_convert_reports_missing_imu_batch(tmp_path):

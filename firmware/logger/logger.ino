@@ -178,6 +178,8 @@ static void sendStatus() {
   noInterrupts();
   s.tach_pulses = fan::tachPulses;
   s.tach_period_us = fan::tachPeriodUs;
+  s.tach_edge_us = fan::lastEdgeUs;
+  s.tach_rejected = fan::tachRejected;
   interrupts();
   s.pwm_permille = fan::dutyPermille;
   s.temp_centi_c = isnan(tempC) ? INT16_MIN : (int16_t)lroundf(tempC * 100);

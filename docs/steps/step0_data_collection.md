@@ -17,8 +17,9 @@ This step also runs a quick check that the board can train the model at all.
                                                     data/raw/<session>/ : meta, events, stream, session.npz
 ```
 
-- **The board measures.** Vibration 833 times a second, sound (optional, 16 kHz), temperature and fan
-  speed, all sent to the laptop. It also sets the fan speed when told to.
+- **The board measures.** Vibration and rotation (accelerometer + gyro, 833 times a second), magnetic
+  field (~274 Hz), sound (optional, 16 kHz), temperature, humidity, pressure, light and fan speed, all
+  sent to the laptop. It also sets the fan speed when told to.
 - **The laptop is in charge.** The recorder runs a speed script ("50 % for 5 min, then 70 %..."), saves
   everything the board sends, and labels the session with what you tell it (which fan, which fault).
 
@@ -30,6 +31,8 @@ This step also runs a quick check that the board can train the model at all.
 | `firmware/logger/` | Data logger firmware (sensors, fan control, USB streaming). Settings are in `config.h` |
 | `firmware/i2c_scan/` | Bring-up check: lists the sensors on the I2C bus and identifies the IMU revision |
 | `host/fanlog/record.py` | Records one labelled session from the logger |
+| `host/fanlog/campaign.py` | Unattended (overnight) recording: mount check, then sweep / 70 % / drift / 30-min steady cycles until a set time |
+| `host/analysis/` | Exploration of own sessions: per-window order features, stability, drift, report figures (see `results/own/overnight/REPORT.md`) |
 | `host/fanlog/session.py` | Converts a session's raw stream into `session.npz` and checks for lost data |
 | `host/fanlog/datasets.py` | Downloads and loads public datasets (UCI cooler-fan accelerometer set, Fraunhofer unbalance set) |
 | `host/profiles/*.json` | Fan speed scripts the recorder plays during a session |
@@ -193,7 +196,10 @@ FL client.
 
 **It worked if:**
 - `rpm` changes when the PWM step changes, and is steady within a step.
-- `imu` stays around 835–840 Hz (the sensor's own clock runs slightly fast of the nominal 833 Hz).
+- `imu` stays around 825–835 Hz (nominal 833 Hz; the IMU's own clock and the board's RC time base both
+  differ from nominal by under 1 %).
+- `rpm` matches the fan's sound: logger 0.3.1 times tach edges on a 1 MHz crystal timer and filters PWM
+  glitches. 0.3.0 counted 1–1.6 % extra pulses under PWM (see `results/own/overnight/REPORT.md`).
 - `overruns`, `audio_drop`, `crc_err` and `lost` stay at 0, and the summary has no `WARNING` lines.
 
 ### What ends up in the session folder
@@ -244,6 +250,13 @@ faults come after.
 | Obstruction | `constant_10min` | 25 % and 50 % of the inlet covered with card | Airflow / acoustic change |
 | Blade damage | `speed_sweep` | 1, **only on a spare fan you can sacrifice** | Permanent damage |
 | Bearing wear | `speed_sweep` | Only if you have an old, noisy fan | Real wear is hard to fake reversibly |
+
+**Unattended runs.** `python -m fanlog.campaign --port COM6 --fan pc01 --mount tapeCorner --fault normal --until 07:30`
+runs a mount check, then repeats sweep / 70 % / benign drift / 30-min steady cycles until the given time,
+then a final mount check. It keeps Windows awake, retries a failed session, and stops early if a file
+named `STOP` appears in the output folder. `python host/analysis/autoproc.py <campaign log>` builds the
+analysis tables as sessions finish. For a fault night use A-B-A: a healthy reference right before,
+the fault sessions, then a healthy session after removing the fault.
 
 A truly gradual fault can't be recorded mechanically. The RL simulator in step 3 builds gradual-fault
 episodes by splicing sessions of increasing severity.

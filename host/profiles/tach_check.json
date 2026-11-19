@@ -1,0 +1,11 @@
+{
+  "name": "tach_check",
+  "description": "Short check of logger 0.3.1 tach timing: tach speed vs audio blade-pass speed at 5 duties.",
+  "steps": [
+    {"pwm": 300,  "seconds": 40, "label": "duty30"},
+    {"pwm": 500,  "seconds": 40, "label": "duty50"},
+    {"pwm": 700,  "seconds": 40, "label": "duty70"},
+    {"pwm": 900,  "seconds": 40, "label": "duty90"},
+    {"pwm": 1000, "seconds": 40, "label": "duty100"}
+  ]
+}

@@ -1,6 +1,6 @@
 # Session Handoff
 
-Last updated: Wed 18 Nov 2026. For Jonathan, or a new Claude session picking this up.
+Last updated: Thu 19 Nov 2026. For Jonathan, or a new Claude session picking this up.
 The plan is [`docs/implementation_plan.md`](docs/implementation_plan.md) (it wins over the proposal docx).
 The to-do list lives in `Work/personal-assistant-bot/todos.md`.
 
@@ -8,7 +8,7 @@ The to-do list lives in `Work/personal-assistant-bot/todos.md`.
 
 | Step | Status | Date |
 |---|---|---|
-| 0. Data | Logger ported to the Feather Sense and bench-tested on the board (no fan yet). Smoke test passed. No recordings yet. | Code 7 Oct; board 18 Nov |
+| 0. Data | Logger 0.3.1 on the board (all sensors, fan wired). 7.4 h healthy overnight campaign recorded (`pc01` on `tapeCorner`). Fault (Blu-Tack imbalance) night next. | Code 7 Oct; board 18 Nov; healthy data 19 Nov |
 | 1. Features | Provisional 48 features coded. Real feature engineering not started. | 8 Oct |
 | 2. Anomaly model | Done on Fraunhofer (MLP autoencoder 48-16-8-16-48, provisional) | 8 Oct |
 | 3. RL simulator | Done on Fraunhofer (Q-table + baselines) | 8 Oct |
@@ -18,16 +18,14 @@ The to-do list lives in `Work/personal-assistant-bot/todos.md`.
 
 ## Next steps, in order
 
-1. **Step 0, Parts B and E → G** of [`docs/steps/step0_data_collection.md`](docs/steps/step0_data_collection.md). Parts A, C and D are done (18 Nov).
-   - B: mount fan and board, wire PWM to **pin 5** and tach to **pin 6** (not D2/D3), do the two multimeter checks.
-   - C: done. 8.6 KB RAM, 0.23 ms forward and 0.58 ms train step per window (numbers in Part C).
-   - D: done. Logger 0.2.0 is on the board.
-   - E–F: bring-up sessions 1–3 (saved to `data/bringup`, see bench tips). PWM and tach are untested
-     until a fan is wired.
-2. **Minimum data set, one fan (`pc01` on `plateA`), before exams.** About 2.7 h of recording:
-   normal sweep ×2, steady ×2, benign drift ×2, imbalance at 3 severities (0.1 / 0.2 / 0.5 g, sweep).
-   Other fans and faults come later.
-3. **Step 1 on own data**: order-normalised bands first (plan, "Feature engineering", idea 1).
+1. **Imbalance night (Blu-Tack), same mount, A-B-A.** Plan and safety notes in
+   [`results/own/overnight/REPORT.md`](results/own/overnight/REPORT.md) section 9. Don't touch the
+   fan or board before it. Normal sessions for the minimum set are done (overnight, 19 Nov).
+2. **Step 1 on own data**: order-normalised features first. The overnight data already shows why:
+   fixed-Hz features give 93 % false alarms at unseen speeds, order amplitudes 0.26 %
+   (`host/analysis/night_summary.py`, section 7). Use the 0.3.1 tach as the speed reference.
+   Then port the order features into `host/features/`.
+3. **Step 1 follow-up**: compare with `features.report`, `models.compare`, then a short `rl.train`, all `--source own`.
    Compare with `features.report`, `models.compare`, then a short `rl.train`, all `--source own`.
 4. **Re-run steps 2–4 with `--source own`.** Step 4 needs at least 3 fan@mount clients
    (`fl/simulate.py` stops otherwise), so with one fan only steps 1–3 run.
@@ -36,7 +34,8 @@ The to-do list lives in `Work/personal-assistant-bot/todos.md`.
 - `--source own` loads every session in `data/raw/`. Bring-up sessions would count as normal
   training data, and `--fan none` would count as an extra fan. Until the recorder is changed
   (pending, see "Discussed with Jonathan"), record bring-up with `--out data/bringup`.
-- Always pass `--mount plateA`. The default is `default`, which becomes a separate client.
+- Always pass `--mount` (the current mount is `tapeCorner`: board taped to the fan-frame corner). The
+  default is `default`, which becomes a separate client.
 - Run the recorder from the repo root (profile paths and `--out data/bringup` are relative).
 
 ## Schedule check
@@ -109,6 +108,19 @@ The to-do list lives in `Work/personal-assistant-bot/todos.md`.
   952 Hz and are stale**; re-run steps 2–4 before quoting them.
 - `.venv` is Python 3.11 and out of date with `requirements.txt` (no editable `host` install; pytest
   and pyserial were added 18 Nov). Re-run `pip install -r requirements.txt` when convenient.
+
+## Fan wired, logger 0.3.x and overnight campaign (18–19 Nov)
+
+- Fan `pc01` wired (PWM pin 5, tach pin 6, grounds shared). Board taped to a corner of the fan frame (`tapeCorner`).
+- Logger 0.3.0 added the gyro, magnetometer, pressure and light, and fixed an nRF52 I2C (TWIM) race
+  that corrupted 1.8 % of accelerometer samples. The recorder now reads on a thread with a 1 MB buffer.
+- Logger 0.3.1 (19 Nov) fixes the tach: `micros()` on this core ticks every 976 µs, so the glitch
+  filter failed and the speed read 1–1.6 % high under PWM. Tach edges are now timed on a 1 MHz timer (TIMER4).
+  STATUS grows to 52 bytes (`tach_edge_us`, `tach_rejected`); the host still reads older sessions.
+- Overnight campaign 00:07–07:49: 22 sessions, 7.4 h, every sensor, no data loss. Placement is fine
+  for the fault test (caveats: slow 1× drift, 0.5× rocking at 90–100 %). Full findings:
+  [`results/own/overnight/REPORT.md`](results/own/overnight/REPORT.md).
+- Python tests: `pytest host -q` → **34 passed**.
 
 ## Rules
 

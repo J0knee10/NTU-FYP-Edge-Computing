@@ -1,6 +1,6 @@
 #pragma once
 
-#define FW_VERSION "logger-0.3.0"
+#define FW_VERSION "logger-0.3.1"
 
 // Board: Adafruit Feather nRF52840 Sense (original revision, LSM6DS33 IMU).
 // FQBN adafruit:nrf52:feather52840sense

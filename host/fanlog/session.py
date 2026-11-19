@@ -131,13 +131,20 @@ def convert(session_dir: str | Path) -> dict:
     status = {name: np.array([r[name] for r in status_rows], dtype=np.int64) for name in STATUS_FIELDS}
     status["t_us"] = np.array(status_t, dtype=np.int64)
 
-    # Fan speed from tach pulse deltas between consecutive STATUS frames.
+    # Fan speed from tach pulse deltas between consecutive STATUS frames. Logger >= 0.3.1 also
+    # sends the 1 MHz time of the last tach edge, which gives the exact time those pulses took;
+    # older firmware only has the STATUS time (pulses per 250 ms = 120 rpm steps).
     ppr = int(meta.get("tach_pulses_per_rev", 2))
     rpm = np.full(len(status_t), np.nan)
     if len(status_t) > 1:
         dp = np.diff(status["tach_pulses"])
-        dt = np.diff(status["t_us"]) / 1e6
-        rpm[1:] = np.where(dt > 0, dp / ppr / dt * 60.0, np.nan)
+        if status["tach_edge_us"].any():
+            dt = (np.diff(status["tach_edge_us"]) % (1 << 32)) / 1e6
+            ok = (dp > 0) & (dt > 0)
+            rpm[1:] = np.where(ok, dp / ppr / np.where(ok, dt, 1) * 60.0, np.where(dp == 0, 0.0, np.nan))
+        else:
+            dt = np.diff(status["t_us"]) / 1e6
+            rpm[1:] = np.where(dt > 0, dp / ppr / dt * 60.0, np.nan)
 
     info = meta.get("board_info", {})
     mg_per_lsb = float(info.get("imu_mg_per_lsb", "nan"))

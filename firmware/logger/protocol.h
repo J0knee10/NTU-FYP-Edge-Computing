@@ -38,7 +38,7 @@ struct __attribute__((packed)) StatusPayload {
   uint32_t audio_samples;    // since START
   uint32_t audio_dropped;    // samples dropped (ring full) since START
   uint32_t tach_pulses;      // since boot
-  uint32_t tach_period_us;   // last tach period, 0 if none yet
+  uint32_t tach_period_us;   // last tach period (1 us clock since 0.3.1), 0 if none yet
   uint16_t pwm_permille;     // commanded duty, 1000 = full speed
   int16_t  temp_centi_c;     // SHT3x/SHT4x, INT16_MIN if unavailable
   uint16_t humidity_centi;   // SHT3x/SHT4x, 0xFFFF if unavailable
@@ -46,6 +46,9 @@ struct __attribute__((packed)) StatusPayload {
   uint8_t  reserved;
   uint32_t mag_samples;      // since START
   uint32_t mag_overruns;     // magnetometer samples missed (ZYXOR) since START
+  // logger >= 0.3.1. Speed between two STATUS frames = d(tach_pulses) / d(tach_edge_us).
+  uint32_t tach_edge_us;     // 1 MHz tach clock at the last accepted edge (wraps after 71 min)
+  uint32_t tach_rejected;    // tach edges dropped by the glitch filter, since boot
 };
 
 struct __attribute__((packed)) EnvPayload {

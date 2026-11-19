@@ -85,7 +85,7 @@ def test_status_layout_matches_firmware_header():
     fields = re.findall(r"^\s*(u?int\d+)_t\s+(\w+);", body, re.M)
     assert tuple(name for _, name in fields) == STATUS_FIELDS
     size = sum(int(re.search(r"\d+", t).group()) // 8 for t, _ in fields)
-    assert size == STATUS_STRUCT.size == 44
+    assert size == STATUS_STRUCT.size == 52
 
 
 def test_old_36_byte_status_still_decodes():
@@ -94,6 +94,15 @@ def test_old_36_byte_status_still_decodes():
     old = STATUS_STRUCT_V1.pack(5, 10, 0, 0, 0, 7, 0, 500, 2500, 6000, 3, 0)
     s = decode_status(old)
     assert s["t_us"] == 5 and s["tach_pulses"] == 7 and s["mag_samples"] == 0
+
+
+def test_old_44_byte_status_still_decodes():
+    from fanlog.protocol import STATUS_STRUCT_V2, decode_status
+
+    old = STATUS_STRUCT_V2.pack(5, 10, 0, 0, 0, 7, 0, 500, 2500, 6000, 3, 0, 99, 1)
+    s = decode_status(old)
+    assert s["mag_samples"] == 99 and s["mag_overruns"] == 1
+    assert s["tach_edge_us"] == 0 and s["tach_rejected"] == 0
 
 
 def test_env_layout_matches_firmware_header():

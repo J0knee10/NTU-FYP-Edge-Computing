@@ -108,7 +108,7 @@ class FrameParser:
 
 _SAMPLE_HEADER = struct.Struct("<IIH")  # t_us, first_index, n
 
-STATUS_STRUCT = struct.Struct("<IIIIIIIHhHBBII")
+STATUS_STRUCT = struct.Struct("<IIIIIIIHhHBBIIII")
 STATUS_FIELDS = (
     "t_us",
     "imu_samples",
@@ -124,9 +124,12 @@ STATUS_FIELDS = (
     "reserved",
     "mag_samples",
     "mag_overruns",
+    "tach_edge_us",
+    "tach_rejected",
 )
-# Firmware before logger-0.3.0 sent the first 12 fields only (36 bytes).
-STATUS_STRUCT_V1 = struct.Struct("<IIIIIIIHhHBB")
+# Older firmware sent fewer fields; the missing ones decode as 0.
+STATUS_STRUCT_V1 = struct.Struct("<IIIIIIIHhHBB")  # before logger-0.3.0 (36 bytes)
+STATUS_STRUCT_V2 = struct.Struct("<IIIIIIIHhHBBII")  # logger-0.3.0 (44 bytes)
 
 ENV_STRUCT = struct.Struct("<IIhHHHHBB")
 ENV_FIELDS = (
@@ -168,9 +171,11 @@ def decode_audio(payload: bytes) -> SampleBlock:
 
 
 def decode_status(payload: bytes) -> dict[str, int]:
-    if len(payload) == STATUS_STRUCT_V1.size:
-        values = STATUS_STRUCT_V1.unpack(payload) + (0,) * (len(STATUS_FIELDS) - 12)
-        return dict(zip(STATUS_FIELDS, values))
+    for old in (STATUS_STRUCT_V1, STATUS_STRUCT_V2):
+        if len(payload) == old.size:
+            values = old.unpack(payload)
+            values += (0,) * (len(STATUS_FIELDS) - len(values))
+            return dict(zip(STATUS_FIELDS, values))
     return dict(zip(STATUS_FIELDS, STATUS_STRUCT.unpack(payload)))
 
 
