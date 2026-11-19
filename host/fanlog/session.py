@@ -139,8 +139,10 @@ def convert(session_dir: str | Path) -> dict:
     if len(status_t) > 1:
         dp = np.diff(status["tach_pulses"])
         if status["tach_edge_us"].any():
-            dt = (np.diff(status["tach_edge_us"]) % (1 << 32)) / 1e6
-            ok = (dp > 0) & (dt > 0)
+            edge = status["tach_edge_us"]
+            dt = (np.diff(edge) % (1 << 32)) / 1e6
+            # 0 means "no edge since boot" (fan started after the board), not a time.
+            ok = (dp > 0) & (dt > 0) & (edge[:-1] != 0) & (edge[1:] != 0)
             rpm[1:] = np.where(ok, dp / ppr / np.where(ok, dt, 1) * 60.0, np.where(dp == 0, 0.0, np.nan))
         else:
             dt = np.diff(status["t_us"]) / 1e6

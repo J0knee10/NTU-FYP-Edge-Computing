@@ -169,9 +169,12 @@ def session_recording(session_dir: str | Path) -> Recording:
     n = len(npz["imu_counts"])
     rpm = None
     status_rpm = npz["status_rpm"]
-    if np.isfinite(status_rpm).any():
-        # STATUS frames carry imu_samples = index of the next IMU sample, so they map onto samples.
-        ok = np.isfinite(status_rpm)
+    # STATUS frames carry imu_samples = index of the next IMU sample, so they map onto samples.
+    # Only frames sent while streaming count: before START they still carry the previous session's
+    # counter, which is not monotonic with this session's samples.
+    streaming = (npz["status_flags"] & 1).astype(bool) if "status_flags" in npz else np.ones(len(status_rpm), bool)
+    ok = np.isfinite(status_rpm) & streaming
+    if ok.sum() >= 2:
         rpm = np.interp(np.arange(n), npz["status_imu_samples"][ok], status_rpm[ok]).astype(np.float32)
     fault = meta.get("fault", "")
     return Recording(

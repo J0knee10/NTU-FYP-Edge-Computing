@@ -21,6 +21,9 @@ class Session:
         # STATUS: board time and per-stream sample counters at that time.
         self.st_t = z["status_t_us"].astype(float) / 1e6
         self.st = {k[7:]: z[k] for k in z if k.startswith("status_")}
+        # STATUS rows sent while streaming. Rows from before START still carry the previous
+        # session's sample counters, so counter-to-time maps must use these rows only.
+        self.streaming = (self.st["flags"] & 1).astype(bool)
         self.acc = z["imu_counts"].astype(float) * float(z["imu_g_per_count"])
         self.gyro = z["gyro_counts"].astype(float) * float(z["gyro_dps_per_count"]) if "gyro_counts" in z else None
         self.mag = z["mag_counts"].astype(float) * float(z["mag_gauss_per_count"]) if "mag_counts" in z else None
@@ -35,12 +38,13 @@ class Session:
         self.segments = self._segments()
 
     def _rate(self, key):
-        s = self.st[key].astype(float)
+        s = self.st[key].astype(float)[self.streaming]
+        t = self.st_t[self.streaming]
         m = np.nonzero(np.diff(s) > 0)[0]
         if len(m) < 4:
             return np.nan
         i0, i1 = m[0] + 1, m[-1]
-        return (s[i1] - s[i0]) / (self.st_t[i1] - self.st_t[i0])
+        return (s[i1] - s[i0]) / (t[i1] - t[i0])
 
     def _segments(self):
         """Profile steps as board-time intervals (settling time removed)."""
@@ -60,8 +64,8 @@ class Session:
         return out
 
     def index_at(self, stream: str, t: float) -> int:
-        """Sample index of a stream at board time t (from STATUS counters)."""
-        return int(np.interp(t, self.st_t, self.st[f"{stream}_samples"].astype(float)))
+        """Sample index of a stream at board time t (from STATUS counters of streaming rows)."""
+        return int(np.interp(t, self.st_t[self.streaming], self.st[f"{stream}_samples"].astype(float)[self.streaming]))
 
     def slice(self, stream: str, t0: float, t1: float):
         data = {"imu": self.acc, "gyro": self.gyro, "mag": self.mag, "audio": self.audio}[stream]

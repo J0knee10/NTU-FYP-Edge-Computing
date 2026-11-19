@@ -1,0 +1,12 @@
+{
+  "name": "ab_block",
+  "description": "One block of an A-B-A fault test (about 12 min): gentle start at 40 %, then 50-80 % where the flat4 mount is steady, then a repeat of 50 %. No 100 %: an added mass is never run at full speed, and the flat4 mount bounces there.",
+  "steps": [
+    {"pwm": 400, "seconds": 180, "label": "duty40"},
+    {"pwm": 500, "seconds": 120, "label": "duty50"},
+    {"pwm": 600, "seconds": 120, "label": "duty60"},
+    {"pwm": 700, "seconds": 120, "label": "duty70"},
+    {"pwm": 800, "seconds": 120, "label": "duty80"},
+    {"pwm": 500, "seconds": 60,  "label": "repeat50"}
+  ]
+}

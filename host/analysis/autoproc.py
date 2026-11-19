@@ -1,5 +1,6 @@
 """Follow the campaign log: build window tables for finished sessions, refresh the summary after
 each cycle, exit on a failed session (code 2) or at campaign end (code 0)."""
+import os
 import re
 import subprocess
 import sys
@@ -23,12 +24,15 @@ while True:
         m = re.search(r"end (\S+) rc=0 saved (\S+)", line)
         if m and m.group(2) not in done:
             done.add(m.group(2))
-            out = Path("results/own/overnight/windows") / (Path(m.group(2)).name + ".npz")
+            out = Path(os.environ.get("ANALYSIS_OUT", "results/own/overnight")) / "windows" / (Path(m.group(2)).name + ".npz")
             if not out.exists():
                 rc, txt = run("windows.py", m.group(2))
                 print(f"processed {m.group(1)} {Path(m.group(2)).name} rc={rc}", flush=True)
                 if rc:
                     print(txt, flush=True)
+                else:
+                    rc, txt = run("session_check.py", m.group(2))
+                    print(txt.strip() if rc == 0 else f"SESSIONCHECK {m.group(1)} failed rc={rc}\n{txt}", flush=True)
             if m.group(1).startswith("steady") or m.group(1) == "mount_check_end":
                 rc, txt = run("night_summary.py", "--blades", "7")
                 print(f"summary refreshed rc={rc}", flush=True)

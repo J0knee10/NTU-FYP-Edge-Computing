@@ -8,7 +8,8 @@ from fanlog.session import convert, unwrap_u32
 RATE_HZ = 952.0
 
 
-def _write_session(tmp_path, n_batches=60, drop_batch=None, t0_us=0xFFFFFFFF - 20_000, rpm=3000.0, edges=False):
+def _write_session(tmp_path, n_batches=60, drop_batch=None, t0_us=0xFFFFFFFF - 20_000, rpm=3000.0, edges=False,
+                   leftover_rows=0):
     """Simulate the firmware: 32-sample IMU batches, 4 Hz status, audio chunks.
 
     t0_us starts just before the uint32 wrap so conversion must unwrap it. With edges=True the
@@ -24,14 +25,30 @@ def _write_session(tmp_path, n_batches=60, drop_batch=None, t0_us=0xFFFFFFFF - 2
         out.extend(encode_frame(ftype, seq, payload))
         seq = (seq + 1) & 0xFF
 
+    # The fan has been running since before t0 (tach pulses count since boot), at a different
+    # speed before START (the previous session's last duty).
+    offset = 1000 if leftover_rows else 0
+    pps_pre = pps * 0.5
+
+    def tach_at(t_rel_us):
+        rate = pps if t_rel_us >= 0 else pps_pre
+        n = offset + int(np.floor(t_rel_us / 1e6 * rate))
+        edge = (t0_us + round((n - offset) / rate * 1e6)) & 0xFFFFFFFF if edges else 0
+        return n, edge
+
+    # STATUS frames sent before START still carry the previous session's counters (not streaming).
+    for k in range(leftover_rows):
+        t_rel = -250_000 * (leftover_rows - k)
+        n, edge_us = tach_at(t_rel)
+        frame(FrameType.STATUS, encode_status(t_us=(t0_us + t_rel) & 0xFFFFFFFF, imu_samples=600_000,
+                                              tach_pulses=n, tach_edge_us=edge_us, flags=0))
     pulses = 0
     next_status_us = 0.0
     for b in range(n_batches):
         first = b * 32
         t_rel = (first + 31) / RATE_HZ * 1e6
         while next_status_us <= t_rel:
-            pulses = int(next_status_us / 1e6 * pps)
-            edge_us = (t0_us + round(pulses / pps * 1e6)) & 0xFFFFFFFF if edges else 0
+            pulses, edge_us = tach_at(next_status_us)
             frame(
                 FrameType.STATUS,
                 encode_status(
@@ -40,6 +57,7 @@ def _write_session(tmp_path, n_batches=60, drop_batch=None, t0_us=0xFFFFFFFF - 2
                     tach_pulses=pulses,
                     tach_edge_us=edge_us,
                     pwm_permille=700,
+                    flags=1,
                 ),
             )
             next_status_us += 250_000
@@ -81,6 +99,16 @@ def test_rpm_from_tach_edge_times_is_exact(tmp_path):
     convert(_write_session(tmp_path, n_batches=120, rpm=1817.0, edges=True))
     rpm = np.load(tmp_path / "session.npz")["status_rpm"][2:]
     assert np.all(np.abs(rpm - 1817.0) < 0.5)
+
+
+def test_recording_rpm_ignores_status_rows_from_before_start(tmp_path):
+    from fanlog.recording import session_recording
+
+    convert(_write_session(tmp_path, n_batches=120, rpm=1817.0, edges=True, leftover_rows=4))
+    rec = session_recording(tmp_path)
+    # Each STATUS speed covers the 250 ms before it; the first streaming one still includes the
+    # pre-START speed, so check from the second STATUS interval on (sample 448).
+    assert np.all(np.abs(rec.rpm[448:] - 1817.0) < 1.0)
 
 
 def test_convert_reports_missing_imu_batch(tmp_path):

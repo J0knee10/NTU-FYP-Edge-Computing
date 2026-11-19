@@ -30,19 +30,43 @@ static HardwarePWM* pwm = nullptr;
 static uint16_t dutyPermille = 1000;  // unset PWM input = full speed per spec
 static bool pwmSet = false;
 
+// Glitch filter state (ISR only).
+static uint32_t tachRefUs = 0;     // trusted period for the 3/4 rule; 0 = rule off
+static uint8_t refRejects = 0;     // edges dropped by the 3/4 rule since the last accepted edge
+static uint8_t lockStreak = 0;     // accepted edges in a row that each followed such a drop
+
 static void onTachEdge() {
   uint32_t now = tachClockUs();
   uint32_t dt = now - lastEdgeUs;
-  // PWM noise on the open-collector line makes extra falling edges, mostly while the line rises
-  // slowly through the pull-up, about half a period after a real edge (measured: +1 % pulses).
-  // Reject an edge if the line is already high again (a short dip), or if it comes sooner than
-  // 3/4 of the previous period (the fan cannot speed up by a third within half a revolution).
-  // After a stop (period > 200 ms) only the fixed minimum applies.
-  uint32_t minDt = tachPeriodUs - tachPeriodUs / 4;
-  if (minDt < TACH_MIN_PERIOD_US || tachPeriodUs > 200000) minDt = TACH_MIN_PERIOD_US;
-  if (dt < minDt || digitalRead(PIN_FAN_TACH) == HIGH) {
+  // PWM noise on the open-collector line makes extra falling edges: bounces right after a real
+  // edge, and dips while the line rises slowly through the pull-up about half a period later
+  // (logger 0.3.0 counted ~1 % extra pulses). Drop an edge if it is too close to the last one,
+  // if the line is already high again (a short dip), or if it comes sooner than 3/4 of a trusted
+  // period (the fan cannot speed up by a third within half a revolution).
+  if (dt < TACH_MIN_PERIOD_US || digitalRead(PIN_FAN_TACH) == HIGH) {
     tachRejected++;
     return;
+  }
+  if (tachRefUs && dt < tachRefUs - tachRefUs / 4) {
+    tachRejected++;
+    refRejects++;
+    return;
+  }
+  // A period is trusted only when it agrees (within 25 %) with the previous one. A lost real
+  // edge, a spin-up or a glitch that got through makes them disagree and switches the 3/4 rule
+  // off until two agree again. Without this (logger 0.3.1) one lost edge locked the count at
+  // 1/2 or 1/3 of the real speed for good. Three accepted edges in a row that each followed a
+  // 3/4-rule drop also switch the rule off: that pattern means it is dropping real edges.
+  lockStreak = refRejects ? lockStreak + 1 : 0;
+  refRejects = 0;
+  uint32_t prev = tachPeriodUs;
+  uint32_t diff = dt > prev ? dt - prev : prev - dt;
+  bool agree = prev && prev <= 200000 && diff <= prev / 4;
+  if (lockStreak >= 3) {
+    tachRefUs = 0;
+    lockStreak = 0;
+  } else {
+    tachRefUs = agree ? dt : 0;
   }
   tachPeriodUs = dt;
   lastEdgeUs = now;
@@ -50,7 +74,12 @@ static void onTachEdge() {
 }
 
 static void begin() {
+  // Ask for the crystal (HFXO). TinyUSB starts it too when USB is powered; on battery this keeps
+  // the 1 MHz tach clock accurate. No wait needed: the timer runs on HFINT until it is up.
+  NRF_CLOCK->TASKS_HFCLKSTART = 1;
   TACH_TIMER->TASKS_STOP = 1;
+  TACH_TIMER->SHORTS = 0;               // clear anything left by the bootloader
+  TACH_TIMER->INTENCLR = 0xFFFFFFFF;
   TACH_TIMER->MODE = TIMER_MODE_MODE_Timer;
   TACH_TIMER->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
   TACH_TIMER->PRESCALER = 4;  // 16 MHz / 2^4 = 1 MHz
