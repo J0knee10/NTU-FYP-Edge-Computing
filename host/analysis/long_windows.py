@@ -61,7 +61,7 @@ def build(table, L, raw_dir):
         a = i * W + W // 2 - L // 2
         if a < 0 or a + L > len(s.acc) or not np.isfinite(f1[i]):
             continue
-        lo, hi = i - half_rows, i + half_rows - 1
+        lo, hi = i - half_rows, i + half_rows  # window covers rows i-4 .. i+4 (half of each end row)
         if lo >= 0 and hi < n:
             settled_l[i] = bool(settled[lo:hi + 1].all() and (pwm[lo:hi + 1] == pwm[i]).all())
         acc_l[i] = narrow_orders(s.acc[a:a + L], fs, f1[i], AX_ORDERS)

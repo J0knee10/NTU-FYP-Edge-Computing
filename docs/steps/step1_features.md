@@ -97,8 +97,9 @@ The evidence is from two healthy campaigns, `tapeCorner` and `flat4` (reports in
 - **Windows must be long.**
   - On the quiet `flat4` mount the fan's own 1× is near the background in a 0.62 s window below about 60 % speed.
   - A 5 s (4096-sample) tach-locked window narrows the band, so a stable 1× line shows from 50 % up.
-  - Result: with an 8-window running median, ×1.5 in-plane is caught 90–99 % of the time at 70–80 %, against 20–30 % with 0.62 s windows, at about 2 % false alarms.
-  - **On `tapeCorner` too**, where the 1× is large at every speed, 5 s windows halve the false alarms (3.0 % vs 6.3 %, rotated thresholds) and raise ×1.5 detection from 52 % to 70 %. So the gain is not specific to the quiet mount.
+  - Result, at matched 2 % false alarms and equal data span (about 10 s): ×1.5 in-plane is caught 90–92 % of the time at 70–80 % with 5 s windows, against 56–68 % with 0.62 s windows (best detector for each, after a methods review).
+  - **On `tapeCorner` too**, where the 1× is large at every speed: at matched 2 % false alarms, ×1.5 is caught 85 % of the time with 5 s windows against 29 % with 0.62 s windows. So the gain is not specific to the quiet mount.
+  - **Thresholds from one held-out healthy session give unstable false alarms** (1–9 %, up to 24 % for streaming). The device needs a longer calibration or an adaptive threshold.
 - **Speed-conditioned normalisation works.** Each feature's healthy median and spread is learned per duty and interpolated in log rpm, with the spread = within- and between-session spread combined. On the board this is one small table per feature.
 - **Some speeds stay hard.** At 30–40 % there is no 1× above the background even at 10 s, because imbalance force scales with ω². An unseen speed between grid points still raises false alarms. Both are jobs for the RL agent: speed as context, ADAPT at a new speed.
 
@@ -121,12 +122,12 @@ All are log10, normalised by the speed table, then scored by max|z| or a small a
   - **RAM:** a 4096-sample int16 ring buffer for accel and gyro is 48 KB, plus a 16 KB float FFT buffer.
   - **CPU:** CMSIS `arm_rfft_fast_f32` at 4096 points per axis, 6 per 0.62 s hop, is roughly 10 ms of CPU per hop (about 2 %).
 - **Streaming approach (no sample buffer):** non-overlapping 5 s windows with a running single-bin DFT per order and axis, and a median over 3 windows (about 15 s).
-  - **Evaluated on 19 Nov** (`--subsample 8 --avg 3`): ×1.5 at 70–80 % is caught 80–94 % of the time depending on the detector, at about 2 % false alarms per window. That is almost as good as the overlapping version.
+  - **Evaluated on 19 Nov** (`--subsample 8 --avg 3`): at matched 2 % false alarms, ×1.5 at 70–80 % is caught 100 % of the time on `flat4`, and ×1.5 overall 99 % on `tapeCorner`. It is as good as the overlapping version, but with few windows the session-based threshold is the least stable.
   - Cost per window: 6 orders × 3 axes × 2 sensors × (a few bins) complex MACs per sample, with no FFT and no buffer.
 
 **Still to do:**
 - Re-run on the real fault blocks (`fault_eval.py`).
-- Choose FFT-with-overlap or streaming. Streaming is cheaper and nearly as good on the synthetic test.
+- Choose FFT-with-overlap or streaming. Streaming is cheaper and as good on the synthetic test, but needs a better threshold calibration.
 - Check the 60 % step after the anti-alias firmware (0.4.0).
 - Port into `host/features/` (`spec.py`, `extract.py`) once decided.
 

@@ -145,7 +145,11 @@ The to-do list lives in `Work/personal-assistant-bot/todos.md`.
 - **flat4 feature evaluation (14:30, 18 sessions)**, in [`results/own/flat4_healthy/REPORT.md`](results/own/flat4_healthy/REPORT.md):
   - The flat mount is quiet in the rotor plane. The in-plane 1× is 0.3–1 mg at 30–60 %, about the background level in a 0.62 s window, so a synthetic ×2 is mostly missed (2–45 %, vs 99.5 % on tapeCorner).
   - A **5 s tach-locked window** (`host/analysis/window_length.py`) finds a stable 1× line from 50 % up, with 2–8× the background. At 30–40 % there is no 1× above the background.
-  - **Tested as feature set L** (`long_windows.py` sidecars + `feature_eval.py --rotate`, 8 threshold sessions): with an 8-window median, ×1.5 in-plane is caught 90–99 % of the time at 70–80 % (0.62 s windows: 20–30 %), at about 2 % false alarms. At 40–60 % neither set catches ×1.5.
+  - **Tested as feature set L** (`long_windows.py` sidecars + `feature_eval.py --rotate`), corrected after a methods review:
+    - At matched 2 % false alarms and about 10 s of data, ×1.5 in-plane is caught 90–92 % of the time at 70–80 % (0.62 s windows: 56–68 %).
+    - On `tapeCorner`: ×1.5 overall 85 % vs 29 %.
+    - At 40–60 % on `flat4`, neither set catches ×1.5.
+    - Thresholds from one held-out session give unstable false alarms (1–9 %), so calibration needs more data.
   - For step 1: take order amplitudes from 5 s tach-locked windows (a single-bin DFT on the board). A uniform spread floor of 0.03 hurts; if needed, floor per feature.
   - The 60 % step is erratic with short windows, likely aliasing; check again after 0.4.0.
 - **A-B-A dry run** on healthy flat4 sweeps (fake B blocks) works end to end. `abtest.py` now also prints a combined 50–80 % effect, a spread floor of 0.02, and axial, all-axis and gyro secondaries. Details are in the protocol doc.

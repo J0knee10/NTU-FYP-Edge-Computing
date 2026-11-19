@@ -31,7 +31,8 @@ def load_dir(d, campaign_only):
     tabs = []
     for f in sorted(glob.glob(str(Path(d) / "windows" / "*.npz"))):
         z = dict(np.load(f, allow_pickle=True))
-        if "acc_axis" not in z or (campaign_only and "campaign" not in str(z["notes"])):
+        if "acc_axis" not in z or (campaign_only and ("campaign" not in str(z["notes"])
+                                                    or str(z.get("fault", "normal")) != "normal")):
             continue
         z["name"] = Path(f).stem
         side = Path(d) / "windows_long" / Path(f).name
@@ -61,18 +62,17 @@ def main():
         flagged = {}  # (block, detector) -> {duty: [% per rotation]}
         for th_idx in sweepish:
             tr_idx = [i for i in range(len(train)) if i != th_idx]
-            tr = fe.gather(train, tr_idx, set_name, DUTIES)
-            th = fe.gather(train, [th_idx], set_name, DUTIES)
-            norm = fe.SpeedNorm(tr[0], tr[1], tr[2], tr[4], args.avg)
-            Ztr = fe.running_median(norm(tr[0], tr[1]), tr[3], args.avg)
-            Zth = fe.running_median(norm(th[0], th[1]), th[3], args.avg)
+            tr = fe.gather(train, tr_idx, set_name, DUTIES, args.avg)
+            th = fe.gather(train, [th_idx], set_name, DUTIES, args.avg)
+            norm = fe.SpeedNorm(*tr)
+            Ztr, Zth = norm(tr[0], tr[1]), norm(th[0], th[1])
             dets = fe.detectors(Ztr, args.seeds)
             groups = {"max|z|": ["max|z|"], "Mahalanobis": ["Mahalanobis"], "AE": [k for k in dets if k.startswith("AE")]}
             for b, t in enumerate(test):
-                te = fe.gather(test, [b], set_name, DUTIES)
+                te = fe.gather(test, [b], set_name, DUTIES, args.avg)
                 if len(te[0]) == 0:
                     continue
-                Zte = fe.running_median(norm(te[0], te[1]), te[3], args.avg)
+                Zte = norm(te[0], te[1])
                 for g, ks in groups.items():
                     hits = np.mean([dets[k](Zte) > np.quantile(dets[k](Zth), 0.99) for k in ks], axis=0)
                     for d in np.unique(te[2]):

@@ -54,33 +54,48 @@ The synthetic test also overstates the problem at low speed. Multiplying a backg
 - Take the order amplitudes (at least 1×) from a long tach-locked window (about 4096 samples, 5 s) rather than from the 512-sample windows. On the board this is a single-bin DFT per order (O(n), no FFT needed).
 - Put a floor on each feature's spread, so very stable features can't dominate max|z|.
 
-## Long-window features tested (set L), with the threshold session rotated
+## Long-window features tested (set L), corrected after a methods review
 
 - **Sidecars.** `host/analysis/long_windows.py` adds, for every short-window row, per-axis orders from a 4096-sample (5 s) tach-locked window centred on it. They go in `windows_long/`, which is not in git; rerun the script to make them.
-- **The L set** in `feature_eval.py` is set O with these orders in place of the 0.62 s ones. Every set is then scored on the same rows: those whose whole 5 s window lies in one settled step.
-- **Rotation.** One held-out threshold session made the numbers swing; O at ×2 went from 2 % to 46 % just by changing that session. `--rotate` repeats the test with each of the 8 sweep-type training sessions as the threshold session and reports mean [min–max].
+- **The L set** in `feature_eval.py` is set O with these orders in place of the 0.62 s ones. The 12× and 150–400 Hz columns stay short-window in both. Every set is scored on the same rows: those whose whole 5 s window lies in one settled step.
+- **Rotation.** One held-out threshold session made the numbers swing. `--rotate` repeats the test with each of the 8 sweep-type training sessions as the threshold session and reports mean [min–max].
 
-`feature_eval_grid10L_rot.json` (10 % grid, 8-window median):
+**Methods review (19 Nov, 15:30).** An independent review found that the first version of this section overstated L's lead, and one claim was wrong. Fixed in `feature_eval.py`, and every number below was rerun:
+1. **Sets were compared at different false-alarm rates.** Comparisons now use detection at **matched 2 % false alarms** (an oracle threshold on the healthy test windows, for comparison only).
+2. **The spread assumed independent windows** (a 1.25/√avg factor). Overlapping 5 s windows aren't independent, so L's z-scores were inflated. The spread is now measured on the running-medianed features themselves.
+3. **The running median started fresh at each scored row's step,** so O's first rows used fewer windows. The median now runs over every settled row, repeated visits to a duty are kept apart, and only rows with a full median are scored.
+4. `settled_long` was half a row short at the end of each step (negligible). Fixed and rebuilt.
+5. **Withdrawn:** "L is much less sensitive to which session sets the threshold". With session-based thresholds, both sets' false alarms vary a lot between threshold sessions (below).
 
-| Set | Detector | False alarms | ×1.25 | ×1.5 | ×2 | ×1.5 at 70 / 80 % | ×1.5 at 40 / 50 / 60 % |
+**Matched 2 % false alarms** (`feature_eval_grid10L_rot.json`; 18 sessions, mean over 8 rotations):
+
+| Set | Median | Detector | ×1.25 | ×1.5 | ×2 | ×1.5 at 70 / 80 % | ×1.5 at 40 / 50 / 60 % |
 |---|---|---|---|---|---|---|---|
-| O | max\|z\| | 3.8 [1.1–7.0] % | 4 | 15 [1–46] | 51 [15–75] | 19 / 21 | 15 / 0 / 13 |
-| O | AE | 2.1 [1.0–4.0] % | 3 | 18 [2–39] | 61 [50–72] | 27 / 32 | 15 / 1 / 2 |
-| **L** | **max\|z\|** | **2.1 [1.3–4.7] %** | 12 | **57 [54–62]** | 70 [62–80] | **99 / 90** | 11 / 1 / 8 |
-| L | AE | 2.8 [1.3–5.6] % | 17 | 54 [20–67] | 72 [35–87] | 90 / 77 | 19 / 6 / 9 |
+| O | 8 (5 s) | max\|z\| | 2 | 2 | 17 | 0 / 1 | 6 / 0 / 8 |
+| O | 8 (5 s) | Mahalanobis | 3 | 23 | 68 | 37 / 29 | 20 / 0 / 2 |
+| O | 16 (10 s) | Mahalanobis | 3 | 41 | 79 | 68 / 56 | 21 / 0 / 0 |
+| **L** | **8 (9.4 s)** | **Mahalanobis** | 6 | **54** | 65 | **92 / 90** | 15 / 0 / 4 |
+| L | 8 (9.4 s) | max\|z\| | 6 | 53 | 64 | 91 / 90 | 13 / 0 / 3 |
+| L | 8 (9.4 s) | AE | 7 | 46 | 65 | 79 / 69 | 12 / 0 / 4 |
+| L, streaming | 3 non-overlapping (15 s) | max\|z\| | 8 | 62 | 82 | 100 / 100 | 9 / 1 / 31 |
+| O, streaming | 3 (subsampled rows) | max\|z\| | 3 | 6 | 40 | 1 / 17 | 8 / 0 / 19 |
 
-- **At 70–80 % the 5 s windows are what make detection work.** A ×1.5 change is caught 90–99 % of the time, against 20–30 % with 0.62 s windows, at a similar false-alarm rate. L is also much less sensitive to which session sets the threshold.
+- **At 70–80 %, at equal data span (about 10 s) and equal false alarms, L leads O by 25–35 points** (92 / 90 % against 68 / 56 %). The narrow tach-locked band helps; it is not just more data. The lead is smaller than first reported.
+- **The streaming variant** (non-overlapping 5 s windows, median of 3; no sample buffer on the board) is at least as good: 100 % at 70–80 %.
 - **At 40–60 % neither set catches a ×1.5 change** in the fan's own 1×, which is near the background there. A real added mass adds its own 1× force, so tonight's blocks will show whether it rises above the background at these speeds.
-- **No single window is enough.** Without the running median, L catches ×1.5 at 70–80 % only 59–64 % of the time: one 5 s window is not enough, and the median over 8 overlapping windows (about 9 s) is needed.
-- **The gain is not just more data.**
-  - L's 8-window median spans about 9.4 s (overlapping 5 s windows); O's spans 5 s.
-  - At equal span, O with a 16-window median (about 10 s; `feature_eval_grid10L_rot_avg16.json`, `--max-sessions 18` for the same split) catches ×1.5 at 70 / 80 % 50 / 45 % of the time at 3.4 % false alarms. L gets 99 / 90 % at 2.1 %.
-  - At equal 5 s, L with no median gets 59 / 64 % and O with an 8-window median 19 / 21 %.
-  - The narrow tach-locked band, with its lower background, is what helps.
-- **A spread floor of 0.03 log10** (`feature_eval_grid10L_rot_f03.json`) lowers false alarms to about 1 %, but drops L's ×1.5 detection at 70–80 % to 14 %: the floor is larger than the 1× spread there. Don't use a uniform floor. If a floor is needed, set it per feature (for example only for 12× and the 150–400 Hz band).
-- **Oall (vector orders) stays blind** (≤ 7 % at ×2), as on `tapeCorner`. Features must be per axis.
-- **The streaming variant also works** (`feature_eval_grid10L_rot_sub8.json`, `--subsample 8 --avg 3`): non-overlapping 5 s windows, as a running single-bin DFT on the board would give, with a median of 3 (15 s). L catches ×1.5 at 70 / 80 % 81 / 84 % of the time with max|z|, 94 / 93 % with Mahalanobis and 80 / 87 % with the AE, at 1.9–2.7 % false alarms. That is close to the overlapping version, with no sample buffer and slower decisions.
-- **False alarms per window are not per hour.** 2 % of 0.62 s windows is about 116 flags an hour; 2 % of 5 s windows is about 14 an hour. Either way a single flag can't trigger ALERT. Persistence over several windows, which is in the RL state, has to do that work.
+- **A ×2 change is caught only about 65–80 % of the time overall,** because the 40–60 % rows are part of the test.
+- **Thresholds from one held-out session give unstable false alarms**, for O and L alike:
+
+  | Run | False alarms, mean [min–max] |
+  |---|---|
+  | L, 8-window median | 3.1–3.4 % [1.0–8.9] |
+  | O, 8-window median | 2.8–3.8 % [0.3–11.6] |
+  | L, streaming | 3.9–5.2 % [0.3–19] |
+
+  The 99th percentile of one session is a noisy threshold, worst for streaming, which has few windows. **A device needs a longer calibration** (several healthy sessions or speeds pooled), or a threshold that adapts. The RL agent's persistence and ADAPT logic is the natural place.
+- **Oall (vector orders) stays blind** (≤ 7 % at ×2 in the earlier runs), as on `tapeCorner`. Features must be per axis.
+- **A spread floor of 0.03 log10** (`feature_eval_grid10L_rot_f03.json`, made before the review fixes) hurt detection. Don't use a uniform floor.
+- **False alarms per window are not per hour.** 2 % of 0.62 s windows is about 116 flags an hour; 2 % of 5 s windows is about 14 an hour. A single flag can't trigger ALERT. Persistence over several windows, which is in the RL state, has to do that work.
 
 ## Unseen speeds
 
@@ -99,11 +114,12 @@ Learning a new speed stays an RL-agent role (ADAPT at a new speed) rather than s
 - `feature_eval_grid10.json`: `--duties 300:800:100 --lodo 400:800` (comparable with `tapeCorner`).
 - `feature_eval_grid5.json`: `--duties 300:1000:50 --lodo 350:950`.
 - `window_length.json`: the window-length table.
-- `feature_eval_grid10L.json`: with the L set (single threshold session).
+- `feature_eval_grid10L.json`: with the L set (single threshold session; before the review fixes).
 - `feature_eval_grid10L_rot.json`: the same with the threshold session rotated.
-- `feature_eval_grid10L_rot_f03.json`: as above, with a 0.03 spread floor.
+- `feature_eval_grid10L_rot_f03.json`: rotated, with a 0.03 spread floor (before the review fixes).
+- `feature_eval_grid10L_rot_avg16.json`, `feature_eval_grid10L_rot_sub8.json`: 16-window median; streaming.
 - To rebuild:
   - `ANALYSIS_OUT=results/own/flat4_healthy python host/analysis/long_windows.py`
-  - then `feature_eval.py --rotate --tag grid10L_rot`.
+  - then `feature_eval.py --rotate --max-sessions 18 --tag grid10L_rot`.
 - `summary.json`, `figs/`: `night_summary.py`, run by `autoproc.py` after each steady session.
 - A-B-A dry run on these sessions: `docs/experiments/2026-11-19_imbalance_ABA.md`.

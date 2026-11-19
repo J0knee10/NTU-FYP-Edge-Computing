@@ -218,19 +218,25 @@ What this shows (all on the old rocking mount, with a synthetic fault; to be rep
   - Average over about 5 s before scoring.
   - Choose the set by detection rate at a fixed false-alarm rate, not by false alarms alone.
 
-**Update, 19 Nov afternoon: threshold rotation and 5 s windows.**
+**Update, 19 Nov afternoon: threshold rotation, 5 s windows, matched false alarms.**
 
-One held-out threshold session (03:14) turned out to make the numbers swing. `feature_eval.py --rotate` repeats the test with each sweep-type training session as the threshold session (4 on this night) and reports mean [min–max]. It also adds set L: the same 11 features, with orders from 5 s (4096-sample) tach-locked windows (`long_windows.py`). All sets are then scored on the same rows. For this logger version (0.3.0) the speed is the audio-refined one.
+The evaluation changed in three ways (`feature_eval.py`; details in `results/own/flat4_healthy/REPORT.md`):
+- **Threshold rotation.** One held-out threshold session (03:14) made the numbers swing. `--rotate` repeats the test with each sweep-type training session as the threshold session (4 on this night).
+- **Set L.** The same 11 features, with orders from 5 s (4096-sample) tach-locked windows (`long_windows.py`). For logger 0.3.0 the speed is the audio-refined one.
+- **Fixes from a methods review.** The spread is now measured on the medianed features, the running median uses full windows only, and sets are compared at matched 2 % false alarms.
 
-| Set, 8-window median, max\|z\| | False alarms | ×1.25 | ×1.5 | ×2 | ×1.5 at 40 / 50 / 60 / 70 / 80 % |
-|---|---|---|---|---|---|---|
-| O (0.62 s orders) | 6.3 [1.4–14.3] % | 16 | 52 [20–97] | 99.8 | 60 / 35 / 69 / 50 / 36 |
-| **L (5 s orders)** | **3.0 [1.1–5.8] %** | 16 | **70 [47–100]** | 99.0 | 99 / 100 / 94 / 57 / 29 |
-| L, streaming (non-overlapping 5 s, median of 3) | 3.2 [0.2–9.9] % | 31 | 78 [17–99] | 99.8 | 100 / 82 / 76 / 75 / 75 |
+| Set, 8-window median | Detector | False alarms with session-based thresholds | Matched 2 % FA: ×1.25 / ×1.5 / ×2 | ×1.5 at 40 / 50 / 60 / 70 / 80 % (matched) |
+|---|---|---|---|---|
+| O (0.62 s orders) | max\|z\| | 8.0 [0.8–15.2] % | 7 / 29 / 99 | 60 / 26 / 46 / 17 / 8 |
+| O | AE | 5.8 [4.3–9.2] % | 7 / 28 / 99 | 53 / 19 / 40 / 7 / 29 |
+| **L (5 s orders)** | **max\|z\|** | 3.9 [0.5–7.9] % | **9 / 85 / 100** | 100 / 100 / 96 / 95 / 45 |
+| L | AE | 3.8 [0.8–7.1] % | 7 / 62 / 100 | 98 / 93 / 82 / 42 / 32 |
+| L, streaming (non-overlapping 5 s, median of 3) | max\|z\| | 6.8 [0–23.8] % | 27 / 99 / 100 | 100 / 100 / 97 / 100 / 100 |
 
-- **The 1.3 % false-alarm figure in the table above came from a favourable threshold session.** Rotated, O's false alarms average 6.3 % (1.4–14 %).
-- **The 5 s windows halve the false alarms and raise ×1.5 detection on this mount too.** On `flat4` they matter most at 70–80 %; here they matter at 40–60 %.
-- Files: `feature_eval_L_rot.json`, `feature_eval_L_rot_sub8.json`. The `flat4` results are in `results/own/flat4_healthy/REPORT.md`.
+- **The 1.3 % false-alarm figure in the table above came from a favourable threshold session.** Rotated, O's false alarms are 5–8 % on average.
+- **At matched false alarms, L catches ×1.5 85 % of the time against O's 29 %** on this mount too.
+- **Session-based thresholds are unstable for every set,** worst for streaming with few windows. A device needs a longer calibration or an adaptive threshold.
+- Files: `feature_eval_L_rot.json`, `feature_eval_L_rot_sub8.json`.
 
 ## 8. Placement verdict (`tapeCorner`, retired 19 Nov)
 
