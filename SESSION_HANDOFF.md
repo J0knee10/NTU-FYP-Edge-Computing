@@ -8,7 +8,7 @@ The to-do list lives in `Work/personal-assistant-bot/todos.md`.
 
 | Step | Status | Date |
 |---|---|---|
-| 0. Data | Logger 0.3.2 on the board (all sensors, tach edge timing). Healthy data: 7.4 h on `tapeCorner` (overnight 18–19 Nov) and 31 sessions (~10 h) on `flat4` (19 Nov). Blu-Tack A-B-A night next. | Code 7 Oct; board 18 Nov; healthy data 19 Nov |
+| 0. Data | Logger 0.3.2 on the board (all sensors, tach edge timing). Healthy data: 7.4 h on `tapeCorner` (overnight 18–19 Nov) and 31 sessions (~10 h) on `flat4` (19 Nov), plus 25 healthy `ab_block` blocks (19 Nov evening) and an overnight `flat4` campaign (20 Nov, 00:36–07:30). Fault blocks next (revised plan, two parts). | Code 7 Oct; board 18 Nov; healthy data 19–20 Nov |
 | 1. Features | Provisional 48 features coded. Draft spec from own data (11 per-axis order features from 5 s tach-locked windows) in `docs/steps/step1_features.md`, to confirm after the fault night. | 8 Oct; draft 19 Nov |
 | 2. Anomaly model | Done on Fraunhofer (MLP autoencoder 48-16-8-16-48, provisional) | 8 Oct |
 | 3. RL simulator | Done on Fraunhofer (Q-table + baselines) | 8 Oct |
@@ -18,9 +18,14 @@ The to-do list lives in `Work/personal-assistant-bot/todos.md`.
 
 ## Next steps, in order
 
-1. **Imbalance night (Blu-Tack), `flat4`, A-B-A.** Protocol, commands and the analysis fixed in advance:
+1. **Fault blocks, `flat4`, A-B-A, revised plan (decided 19 Nov evening, postponed).** Part 1: imbalance
+   (A0, sham, 0.2 g, A, 0.1 g, A). Part 2 on another day: blocked intake 50 % / 90 % and a paper rub, an A
+   after each. Each part starts with a fresh healthy A0 block. Jonathan handles the fan; Claude runs the
+   recordings. Protocol, commands and the analysis fixed in advance:
    [`docs/experiments/2026-11-19_imbalance_ABA.md`](docs/experiments/2026-11-19_imbalance_ABA.md)
-   (`host/analysis/abtest.py`, then `fault_eval.py`). Then a healthy `flat4` campaign overnight.
+   (`host/analysis/abtest.py --null-from results/own/prenight_20261119/abtest_prenight.json`, then
+   `fault_eval.py`). Primary measures: in-plane 1× (imbalance), speed at fixed PWM (blockage), audio
+   2–7.9 kHz (rub).
 2. **Step 1 on own data:** confirm or revise the draft spec in `docs/steps/step1_features.md` on the
    real fault blocks (5 s tach-locked per-axis orders; the stricter `feature_eval.py` is the reference
    method, not the early overnight-report numbers). Then port it into `host/features/`.
