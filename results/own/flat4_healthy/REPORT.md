@@ -198,6 +198,29 @@ pre-night `ab_block` blocks (`results/own/prenight_20261119/`). There are now 53
   - The per-window models in this folder should be retrained on all 53 sessions before the fault blocks (the
     protocol says: every healthy `flat4` campaign session recorded before the part).
 
+## Daytime 20 Nov (08:00–17:25): level, with a temperature dependence on top
+
+A third healthy campaign on the same mount (28 sessions, logger 0.3.2, nobody touching the fan) brings this folder to
+81 sessions. `summary.json` and `figs/` now cover all 81.
+
+- **The 1× stayed at its overnight level.** Median per-axis 1× (0.62 s windows), sweep-type sessions:
+
+  | Time | In-plane 70 % (mg) | In-plane 80 % | Axial 70 % | Axial 80 % | rpm at 70 % |
+  |---|---|---|---|---|---|
+  | 20 Nov 00:36–07:46 | 1.70–1.87 | 3.07–3.44 | 7.4–8.0 | 13.3–15.0 | 1733–1751 |
+  | 20 Nov 08:00–17:12 | 1.66–1.86 | 3.04–3.55 | 7.3–8.2 | 13.1–15.8 | 1738–1759 |
+
+- **Part of the remaining wander is temperature.** At 80 %, against the board temperature during that step (10 sessions,
+  10:00–17:12, 19.6–24.7 °C):
+  - axial 1× rises about 4 % per °C (r = 0.98), and in-plane about 2 % per °C (r = 0.92);
+  - at the same temperature, axial 1× is still about 20 % below the morning of 19 Nov (about 15–16 mg at 24 °C
+    against 18–21 mg). So the decline of 19 Nov was not temperature alone: run-in or the corners settling also
+    played a part, and that part has stopped.
+  - On 19 Nov the slope looks like 9 %/°C, but that day the temperature fell while the 1× declined, so the two
+    are mixed up there.
+- **What it means:** a detector on this fan needs a temperature term or temperature-matched baselines for the 1×
+  (about ×1.2 over 5 °C), or the agent must ADAPT to it. A ×1.5 fault is still well outside that range.
+
 ## Unseen speeds
 
 Smooth healthy curves did not make unseen speeds easy:
@@ -224,5 +247,5 @@ Learning a new speed stays an RL-agent role (ADAPT at a new speed) rather than s
 - To rebuild:
   - `ANALYSIS_OUT=results/own/flat4_healthy python host/analysis/long_windows.py`
   - then `feature_eval.py --rotate --max-sessions 18 --tag grid10L_rot`.
-- `summary.json`, `figs/`: `night_summary.py`, run by `autoproc.py` after each steady session.
+- `summary.json`, `figs/`: `night_summary.py`, run by `autoproc.py` after each steady session (all 81 sessions).
 - A-B-A dry run on these sessions: `docs/experiments/2026-11-19_imbalance_ABA.md`.
