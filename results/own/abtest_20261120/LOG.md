@@ -11,7 +11,11 @@ logger 0.3.2, profile `ab_block`. Jonathan handled the fan; Claude ran the recor
 | 3 | B 0.2 g | `20261120-180634_pc01_imbalance_0.2g-25mm` | not noted / about 18:06 | sham strip off, 0.2 g Blu-Tack on blade 1 at 25 mm under a fresh strip | **a tape edge was sticking out** (found by Jonathan when removing the mass) |
 | 4 | A | `20261120-182701_pc01_normal_none` | 18:20 / 18:25 | mass removed, fresh empty strip | – |
 | – | extra A 1–21 | `20261120-183929` … `20261120-232615` (21 sessions, `normal_none`) | – | nothing, nobody touching the fan (dinner break) | 256 audio samples dropped in `222355` and `232615` |
-| – | extra A 22– | from `20261120-233918` | – | nothing | Jonathan not back by 23:30; continuing until he returns or 09:00 on 21 Nov |
+| – | extra A 22–57 | `20261120-233918` … `20261121-065543` (36 sessions, `normal_none`) | – | nothing | Jonathan not back by 23:30; overnight continuation. 256–512 audio samples dropped in 4 blocks |
+| – | (excluded) | `20261121-070811_pc01_normal_none` | – | – | **cut short:** the board stopped answering at 07:17 on 21 Nov, 9 min in (see below) |
+
+**Part 1 paused after extra A 57 (decided by Jonathan on 22 Nov, "stop here, continue another day").** Blocks 1–4
+and 57 extra A blocks are done; the 0.1 g block and the A after it are still to do.
 
 From the sham on, blade 1 always carries one tape strip: empty in the A blocks, over the mass in the B blocks.
 A0 is the only block without tape.
@@ -53,6 +57,18 @@ A0 is the only block without tape.
   - A block cut short when he returns is excluded (`abtest.py` warns about it as aborted or short).
   - 23:39: the first run of extra blocks stopped at its 23:30 end time (21 complete blocks). It was restarted at
     once with the same settings, to run until he returns or 09:00 on 21 Nov. No 0.1 g data exists yet.
+- **Board stopped answering, 07:17 on 21 Nov.** In the 38th overnight block (`20261121-070811`), the stream
+  stopped at 07:17:12, and the `PWM 800` command at 07:17:13 got no reply. Windows logged USB driver
+  activity at 07:18:34 and 07:34:55, consistent with the board dropping off USB and coming back. The recorder
+  has no read timeout, so it hung until 22 Nov 20:00, and its process stayed stuck on COM6 even after being
+  killed. That block is excluded. Nothing was recorded from 07:17 on 21 Nov.
+- **Resuming part 1 on another day (decided 22 Nov, before any 0.1 g data):**
+  - after more than a day apart and a possible board reset, record **at least one fresh A block with nobody
+    touching the fan** before the 0.1 g block; that block is its "A before";
+  - then the 0.1 g block and an A after it, as in the protocol;
+  - all blocks from 20–22 Nov stay in the analysis in recorded order. The A-to-A pair across the gap (`065543` →
+    the first new A block) is excluded from the null: it isn't consecutive, and the mount and board may have
+    changed in between.
 - **Proposed, not yet decided: a smaller mass.** Because 0.2 g is so large against this fan's own imbalance, a
   block with about 0.03 g (one staple or a crumb of Blu-Tack) on blade 1 at 25 mm, followed by an A block, was
   proposed after the 0.1 g block. Jonathan decides; it will be logged here before it is recorded.

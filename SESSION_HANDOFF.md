@@ -1,6 +1,6 @@
 # Session Handoff
 
-Last updated: Thu 19 Nov 2026. For Jonathan, or a new Claude session picking this up.
+Last updated: Sun 22 Nov 2026. For Jonathan, or a new Claude session picking this up.
 The plan is [`docs/implementation_plan.md`](docs/implementation_plan.md) (it wins over the proposal docx).
 The to-do list lives in `Work/personal-assistant-bot/todos.md`.
 
@@ -8,7 +8,7 @@ The to-do list lives in `Work/personal-assistant-bot/todos.md`.
 
 | Step | Status | Date |
 |---|---|---|
-| 0. Data | Logger 0.3.2 on the board (all sensors, tach edge timing). Healthy data: 7.4 h on `tapeCorner` (overnight 18–19 Nov) and 31 sessions (~10 h) on `flat4` (19 Nov), plus 25 healthy `ab_block` blocks (19 Nov evening) and an overnight `flat4` campaign (20 Nov, 00:36–07:30). Fault blocks next (revised plan, two parts). | Code 7 Oct; board 18 Nov; healthy data 19–20 Nov |
+| 0. Data | Logger 0.3.2 on the board (all sensors, tach edge timing). Healthy data: 7.4 h on `tapeCorner` (overnight 18–19 Nov) and 31 sessions (~10 h) on `flat4` (19 Nov), plus 25 healthy `ab_block` blocks (19 Nov evening) and `flat4` campaigns overnight and daytime 20 Nov (81 healthy sessions in all). Fault blocks part 1 half done (20–21 Nov). | Code 7 Oct; board 18 Nov; healthy data 19–20 Nov |
 | 1. Features | Provisional 48 features coded. Draft spec from own data (11 per-axis order features from 5 s tach-locked windows) in `docs/steps/step1_features.md`, to confirm after the fault night. | 8 Oct; draft 19 Nov |
 | 2. Anomaly model | Done on Fraunhofer (MLP autoencoder 48-16-8-16-48, provisional) | 8 Oct |
 | 3. RL simulator | Done on Fraunhofer (Q-table + baselines) | 8 Oct |
@@ -18,10 +18,22 @@ The to-do list lives in `Work/personal-assistant-bot/todos.md`.
 
 ## Next steps, in order
 
-1. **Fault blocks, `flat4`, A-B-A, revised plan (decided 19 Nov evening, postponed).** Part 1: imbalance
+1. **Fault blocks, `flat4`, A-B-A, revised plan (decided 19 Nov evening).** Part 1: imbalance
    (A0, sham, 0.2 g, A, 0.1 g, A). Part 2 on another day: blocked intake 50 % / 90 % and a paper rub, an A
    after each. Each part starts with a fresh healthy A0 block. Jonathan handles the fan; Claude runs the
-   recordings. Protocol, commands and the analysis fixed in advance:
+   recordings.
+   - **Part 1 is half done (20–21 Nov), paused on 22 Nov:** A0, sham, 0.2 g, A, then 57 extra healthy A blocks
+     (no handling, empty tape strip on blade 1). Run log and the resume rule:
+     [`results/own/abtest_20261120/LOG.md`](results/own/abtest_20261120/LOG.md).
+   - **To resume:** first check the board answers on COM6 (unplug and replug the USB if a stuck recorder
+     process holds the port). Record one fresh A block with nobody touching the fan. Then the 0.1 g block,
+     then an A after it. Ask Jonathan about the optional tiny-mass block (about 0.03 g plus an A block),
+     and log the answer before recording it.
+   - **Recorder fix to make first:** `fanlog.record` hung for 37 h when the board stopped answering
+     (no read timeout). It should time out and exit with an error, so the overnight script carries on.
+   - **`abtest.py` change before analysing part 1:** leave A-to-A pairs more than about 30 min apart out
+     of the null (the gap from 21 to the resume day), as the log decided.
+   - Protocol, commands and the analysis fixed in advance:
    [`docs/experiments/2026-11-19_imbalance_ABA.md`](docs/experiments/2026-11-19_imbalance_ABA.md)
    (`host/analysis/abtest.py --null-from results/own/prenight_20261119/abtest_prenight.json`, then
    `fault_eval.py`). Primary measures: in-plane 1× (imbalance), speed at fixed PWM (blockage), audio
